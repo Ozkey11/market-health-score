@@ -1,0 +1,9 @@
+{
+ "updated_at": "2026-07-05T21:07:39+00:00",
+ "run_id": "seed-local",
+ "started_at": "seed",
+ "finished_at": "seed",
+ "counters": {
+  "note": "CSV seed run"
+ }
+}

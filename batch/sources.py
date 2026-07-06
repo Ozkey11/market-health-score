@@ -1,0 +1,150 @@
+"""
+sources.py — 指標ごとの取得先リンク集（正本）
+プロジェクトの「◆株価、指数データ取得先リンク集.xlsx」を基に定義。
+取得失敗時、このリンクを data_quality.json 経由でUIに表示する。
+build_json.py がこの定義から data/sources.json も生成する。
+"""
+
+SOURCES = {
+    # ── 株価指数 ─────────────────────────────────────────────
+    "prices:^GSPC": {
+        "label": "S&P500",
+        "links": [
+            {"name": "Yahoo Finance", "url": "https://finance.yahoo.com/quote/%5EGSPC/history/"},
+            {"name": "出来高代用(SPY)", "url": "https://finance.yahoo.com/quote/SPY/history/"},
+        ],
+    },
+    "prices:^NDX": {
+        "label": "ナスダック100",
+        "links": [
+            {"name": "Yahoo Finance(先物)", "url": "https://finance.yahoo.com/quote/NQ%3DF/history/"},
+            {"name": "出来高代用(QQQ)", "url": "https://finance.yahoo.com/quote/QQQ/history/"},
+        ],
+    },
+    "prices:^RUT": {
+        "label": "ラッセル2000",
+        "links": [
+            {"name": "Yahoo Finance", "url": "https://finance.yahoo.com/quote/%5ERUT/history/"},
+            {"name": "出来高代用(IWM)", "url": "https://finance.yahoo.com/quote/IWM/history/"},
+        ],
+    },
+    "prices:SOXL": {
+        "label": "SOXL",
+        "links": [{"name": "Yahoo Finance", "url": "https://finance.yahoo.com/quote/SOXL/history/"}],
+    },
+    "prices:^N225": {
+        "label": "日経225",
+        "links": [
+            {"name": "Yahoo Finance JP", "url": "https://finance.yahoo.co.jp/quote/998407.O/history"},
+            {"name": "出来高代用(1570)", "url": "https://finance.yahoo.co.jp/quote/1570.T/history"},
+        ],
+    },
+    "prices:TOPIX": {
+        "label": "TOPIX",
+        "links": [
+            {"name": "Yahoo Finance JP", "url": "https://finance.yahoo.co.jp/quote/998405.T/history"},
+            {"name": "出来高代用(1306)", "url": "https://finance.yahoo.co.jp/quote/1306.T/history"},
+        ],
+    },
+    # ── センチメント・需給 ────────────────────────────────────
+    "sentiment:vix": {
+        "label": "米VIX指数",
+        "links": [{"name": "Yahoo Finance", "url": "https://finance.yahoo.com/quote/%5EVIX/history/"}],
+    },
+    "sentiment:nk_vi": {
+        "label": "日経VI",
+        "links": [{"name": "Yahoo Finance", "url": "https://finance.yahoo.com/quote/%5ENKVI.OS/"}],
+    },
+    "sentiment:put_call": {
+        "label": "米プットコールレシオ",
+        "links": [{"name": "MacroMicro(日次)", "url": "https://en.macromicro.me/series/1651/us-put-call-ratio-index"}],
+    },
+    "sentiment:fear_greed": {
+        "label": "Fear & Greed Index",
+        "links": [{"name": "CNN Fear & Greed", "url": "https://edition.cnn.com/markets/fear-and-greed"}],
+    },
+    "sentiment:aaii": {
+        "label": "AAII投資家センチメント",
+        "links": [
+            {"name": "AAII公式", "url": "https://www.aaii.com/sentimentsurvey/sent_results"},
+            {"name": "MacroMicro", "url": "https://en.macromicro.me/charts/20828/us-aaii-sentimentsurvey"},
+        ],
+    },
+    "supply:short_sale_ratio": {
+        "label": "日経空売り比率",
+        "links": [{"name": "投資の森", "url": "https://nikkeiyosoku.com/chart/short_sale_ratio/"}],
+    },
+    "supply:up_down_ratio": {
+        "label": "日経騰落レシオ",
+        "links": [
+            {"name": "投資の森", "url": "https://nikkeiyosoku.com/up_down_ratio/"},
+            {"name": "nikkei225jp", "url": "https://nikkei225jp.com/data/touraku.php"},
+        ],
+    },
+    "supply:margin_1570": {
+        "label": "日経レバ1570 信用残",
+        "links": [{"name": "Yahoo Finance JP", "url": "https://finance.yahoo.co.jp/quote/1570.T/history?styl=margin&page=1"}],
+    },
+    # ── ファンダメンタルズ・マクロ ─────────────────────────────
+    "fundamental:shiller_per": {
+        "label": "S&P500シラーPER",
+        "links": [
+            {"name": "phoenixconnect", "url": "https://www.phoenixconnect.jp/shiller_per"},
+            {"name": "multpl.com", "url": "https://www.multpl.com/shiller-pe"},
+        ],
+    },
+    "macro:DGS2": {
+        "label": "米2年債利回り",
+        "links": [
+            {"name": "FRED", "url": "https://fred.stlouisfed.org/series/DGS2"},
+            {"name": "YCharts", "url": "https://ycharts.com/indicators/2_year_treasury_rate"},
+        ],
+    },
+    "macro:DGS10": {
+        "label": "米10年債利回り",
+        "links": [
+            {"name": "FRED", "url": "https://fred.stlouisfed.org/series/DGS10"},
+            {"name": "Yahoo(^TNX)", "url": "https://finance.yahoo.com/quote/%5ETNX/history/"},
+        ],
+    },
+    "macro:jp10y": {
+        "label": "日本10年債利回り",
+        "links": [{"name": "Investing.com", "url": "https://jp.investing.com/rates-bonds/japan-10-year-bond-yield"}],
+    },
+    "macro:dxy": {
+        "label": "米ドル指数",
+        "links": [{"name": "Yahoo Finance", "url": "https://finance.yahoo.com/quote/DX-Y.NYB/history/"}],
+    },
+    "macro:ism_pmi": {
+        "label": "米ISM製造業指数",
+        "links": [{"name": "Investing.com", "url": "https://jp.investing.com/economic-calendar/ism-manufacturing-pmi-173"}],
+    },
+    "macro:BAMLH0A0HYM2": {
+        "label": "米HY債スプレッド",
+        "links": [
+            {"name": "FRED", "url": "https://fred.stlouisfed.org/series/BAMLH0A0HYM2"},
+            {"name": "macrotrends", "url": "https://www.macrotrends.net/3229/us-high-yield-bond-spread"},
+        ],
+    },
+    "macro:move": {
+        "label": "MOVE指数",
+        "links": [{"name": "Yahoo Finance", "url": "https://finance.yahoo.com/quote/%5EMOVE/history/"}],
+    },
+    # ── コモディティ ──────────────────────────────────────────
+    "macro:wti": {
+        "label": "WTI原油先物",
+        "links": [{"name": "Yahoo(CL=F)", "url": "https://finance.yahoo.com/quote/CL=F/"}],
+    },
+    "macro:copper": {
+        "label": "銅先物",
+        "links": [{"name": "Yahoo(HG=F)", "url": "https://finance.yahoo.com/quote/HG%3DF/"}],
+    },
+}
+
+
+def link_for(item_key):
+    """item キー ('prices:^GSPC' 等) から最初のリンクURLを返す。無ければ空文字。"""
+    entry = SOURCES.get(item_key)
+    if entry and entry["links"]:
+        return entry["links"][0]["url"]
+    return ""

@@ -1,0 +1,76 @@
+{
+ "updated_at": "2026-07-05T21:07:39+00:00",
+ "run_id": "seed-local",
+ "items": [
+  {
+   "item": "prices:SPY",
+   "status": "ok",
+   "message": "CSV seed 8417行",
+   "source_link": "",
+   "occurred_at": "2026-07-05T21:07:38+00:00"
+  },
+  {
+   "item": "prices:QQQ",
+   "status": "ok",
+   "message": "CSV seed 6872行",
+   "source_link": "",
+   "occurred_at": "2026-07-05T21:07:38+00:00"
+  },
+  {
+   "item": "prices:IWM",
+   "status": "ok",
+   "message": "CSV seed 6593行",
+   "source_link": "",
+   "occurred_at": "2026-07-05T21:07:38+00:00"
+  },
+  {
+   "item": "prices:SOXL",
+   "status": "ok",
+   "message": "CSV seed 4131行",
+   "source_link": "",
+   "occurred_at": "2026-07-05T21:07:39+00:00"
+  },
+  {
+   "item": "prices:1306.T",
+   "status": "ok",
+   "message": "CSV seed 6115行",
+   "source_link": "",
+   "occurred_at": "2026-07-05T21:07:39+00:00"
+  },
+  {
+   "item": "prices:^GSPC",
+   "status": "ok",
+   "message": "CSV seed",
+   "source_link": "",
+   "occurred_at": "2026-07-05T21:07:39+00:00"
+  },
+  {
+   "item": "sentiment:vix",
+   "status": "ok",
+   "message": "CSV seed",
+   "source_link": "",
+   "occurred_at": "2026-07-05T21:07:39+00:00"
+  },
+  {
+   "item": "sentiment:fear_greed",
+   "status": "failed",
+   "message": "バッチ未実行のため未取得（サンプル）",
+   "source_link": "https://edition.cnn.com/markets/fear-and-greed",
+   "occurred_at": "2026-07-05T21:07:39+00:00"
+  },
+  {
+   "item": "sentiment:put_call",
+   "status": "failed",
+   "message": "バッチ未実行のため未取得（サンプル）",
+   "source_link": "https://en.macromicro.me/series/1651/us-put-call-ratio-index",
+   "occurred_at": "2026-07-05T21:07:39+00:00"
+  },
+  {
+   "item": "fundamental:shiller_per",
+   "status": "manual",
+   "message": "シラーPERは手動入力運用",
+   "source_link": "https://www.phoenixconnect.jp/shiller_per",
+   "occurred_at": "2026-07-05T21:07:39+00:00"
+  }
+ ]
+}

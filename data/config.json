@@ -1,0 +1,6 @@
+{
+  "model_version": "mhs-core-1.0",
+  "note": "重み・閾値の正本はindex.html内CONFIG。将来サーバー計算へ移行する際はここへ集約する（設計書Phase 5）。",
+  "layerWeights": { "base": 0.55, "confirmation": 0.25, "sentiment": 0.20 },
+  "regimeAdjustment": { "oscMaxDelta": 0.10, "devMaxDelta": 0.10 }
+}

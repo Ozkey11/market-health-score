@@ -1,0 +1,2269 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>S&P 500 天井・大底 スコア判定</title>
+<style>
+:root{
+  --bg:#07090f;--bg2:#0c1020;--bg3:#111828;
+  --t1:#dde0f0;--t2:#7878a0;--t3:#404060;
+  --bd:#181e32;--bd2:#202840;
+  --grn:#1D9E75;--red:#D85A30;--ylw:#B07010;
+  --acc:#534AB7;
+  --r:10px;--rl:16px;
+  --mono:'Courier New',monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:#e8edf2;color:var(--t1);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh}
+.wrap{max-width:800px;margin:0 auto;padding:28px 24px 60px;background:var(--bg);box-shadow:0 4px 32px rgba(0,0,0,0.22);}
+h1{font-size:21px;font-weight:500}
+.panel{background:var(--bg2);border:.5px solid var(--bd2);border-radius:var(--rl);padding:18px;margin-bottom:18px}
+.tabs{display:flex;gap:4px;margin-bottom:14px;flex-wrap:wrap}
+.tab{padding:6px 14px;border-radius:6px;border:.5px solid var(--bd2);cursor:pointer;font-size:13px;color:var(--t2);background:transparent;font-family:inherit}
+.tab.on{background:var(--acc);border-color:var(--acc);color:#fff}
+input[type=text],input[type=password]{width:100%;background:var(--bg);border:.5px solid var(--bd2);border-radius:6px;color:var(--t1);font-family:var(--mono);font-size:13px;padding:9px 12px;outline:none;transition:border-color .15s}
+input:focus{border-color:var(--acc)}
+button{cursor:pointer;font-family:inherit;font-size:13px;border-radius:6px;padding:8px 18px;border:.5px solid var(--bd2);background:var(--bg3);color:var(--t1);transition:background .15s}
+button:hover:not(:disabled){background:var(--bd)}
+button:disabled{opacity:.4;cursor:default}
+.btn-p{background:var(--acc);border-color:#6B62CC;color:#fff}
+.btn-p:hover:not(:disabled){background:#6B62CC}
+.spinner{width:30px;height:30px;border:2px solid var(--bd);border-top-color:var(--acc);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 12px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.err{background:rgba(216,90,48,.12);border:.5px solid rgba(216,90,48,.4);border-radius:var(--r);padding:12px 16px;font-size:13px;color:var(--red);margin-top:12px}
+.sec{font-size:13px;color:var(--t2);font-weight:600;margin:18px 0 10px;letter-spacing:.04em}
+.info-g{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px}
+.info-c{background:var(--bg2);border:.5px solid var(--bd);border-radius:var(--r);padding:12px 14px}
+.info-c .ls{font-size:12px;color:var(--t2);font-weight:500;margin-bottom:4px}
+.info-c .lv{font-size:16px;font-weight:600;color:var(--t1)}
+.ind-t{width:100%;border-collapse:collapse;font-size:13px}
+.ind-t th{text-align:left;font-size:13px;color:var(--t2);font-weight:600;padding:8px 10px;border-bottom:.5px solid var(--bd)}
+.ind-t td{padding:8px 10px;border-bottom:.5px solid var(--bd);vertical-align:middle}
+.ind-t tr:last-child td{border-bottom:none}
+.ind-t tfoot td{background:var(--bg2)}
+.bar-w{width:120px;height:7px;background:var(--bd);border-radius:4px;overflow:hidden;position:relative}
+.bar-f{height:100%;border-radius:3px;transition:width .8s ease}
+.disp-g{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
+.disp-c{background:var(--bg2);border:.5px solid var(--bd);border-radius:var(--r);padding:12px 14px}
+.verdict{display:inline-block;font-size:15px;font-weight:500;padding:8px 24px;border-radius:8px;margin:10px 0 4px}
+.foot{font-size:11px;color:var(--t3)}
+@media(min-width:800px){.wrap{margin:24px auto;border-radius:16px;}}
+@media(max-width:560px){
+  .info-g{grid-template-columns:1fr 1fr}
+  .ind-t{font-size:11px}
+  .ind-t th:nth-child(5),.ind-t td:nth-child(5){display:none}
+  .disp-g{grid-template-columns:1fr}
+}
+.chip{display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;
+  cursor:pointer;border:.5px solid var(--bd2);color:var(--t2);background:transparent;
+  transition:all .15s;font-family:inherit;white-space:nowrap}
+.chip:hover{background:var(--bg3);color:var(--t1)}
+.chip.on{background:var(--acc);border-color:#6B62CC;color:#fff}
+.layer-head{display:flex;align-items:center;gap:10px;margin:22px 0 10px}
+.layer-num{width:24px;height:24px;border-radius:6px;background:var(--bg3);border:.5px solid var(--bd2);
+  display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--t2);flex-shrink:0}
+.layer-title{font-size:14px;font-weight:600;color:var(--t1)}
+.layer-sub{font-size:11px;color:var(--t2);margin-left:auto}
+.regime-pill{display:inline-flex;align-items:center;gap:6px;padding:6px 16px;border-radius:8px;font-size:14px;font-weight:600}
+.dual-gauge{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.dual-gauge .gbox{background:var(--bg2);border:.5px solid var(--bd);border-radius:var(--rl);padding:14px 10px 8px;text-align:center}
+.mini-stat{background:var(--bg2);border:.5px solid var(--bd);border-radius:var(--r);padding:10px 12px}
+.mini-stat .ml{font-size:11px;color:var(--t2);margin-bottom:3px}
+.mini-stat .mv{font-size:14px;color:var(--t1);font-weight:500}
+.div-row{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;border-bottom:.5px solid var(--bd);font-size:13px}
+.div-row:last-child{border-bottom:none}
+.div-tag{font-size:11px;padding:2px 9px;border-radius:5px;font-weight:600}
+.conf-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.conf-num{font-size:32px;font-weight:700;font-family:'Courier New',monospace}
+
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- Header -->
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;padding-bottom:16px;border-bottom:.5px solid var(--bd)">
+  <div>
+    <p style="font-size:11px;color:var(--t3);margin-bottom:2px;letter-spacing:.06em">機械的テクニカルスコアリング</p>
+    <h1 id="mainTitle">テクニカルスコア判定</h1>
+  </div>
+</div>
+
+<!-- Symbol Bar (常時表示: タブ・銘柄チップ・検索窓・表示/再取得ボタン) -->
+<div class="panel" id="symbolBar" style="margin-bottom:14px">
+  <div class="tabs">
+    <button class="tab on" data-s="yahoo">Yahoo Finance (キー不要)</button>
+    <button class="tab" data-s="av">Alpha Vantage</button>
+    <button class="tab" data-s="fh">Finnhub</button>
+    <button class="tab" data-s="json" id="tabJson" title="GitHub Pages上のバッチ生成JSON（data/history_1y.json）を読み込みます">📦 JSON(Pages)</button>
+  </div>
+
+  <!-- APIキー入力欄（選択中のタブに応じて自動表示） -->
+  <div id="dKeyArea" style="display:none;margin:10px 0;padding:10px;background:var(--bg);border-radius:var(--r);border:.5px solid var(--bd)">
+    <div id="keyAVBox" style="display:none;margin-bottom:8px">
+      <p style="font-size:11px;color:var(--t3);margin-bottom:5px">
+        Alpha Vantage APIキー
+        <a href="https://www.alphavantage.co/support/#api-key" target="_blank" style="color:#7B74E0;margin-left:4px">無料キーを取得</a>
+      </p>
+      <div style="display:flex;gap:6px">
+        <input type="password" id="iKeyAV" placeholder="キーを入力..." style="flex:1"/>
+        <button id="btnShowAV" style="flex-shrink:0;padding:8px 10px;white-space:nowrap">表示</button>
+      </div>
+    </div>
+    <div id="keyFHBox" style="display:none">
+      <p style="font-size:11px;color:var(--t3);margin-bottom:5px">
+        Finnhub APIキー
+        <a href="https://finnhub.io/" target="_blank" style="color:#7B74E0;margin-left:4px">無料キーを取得</a>
+      </p>
+      <div style="display:flex;gap:6px">
+        <input type="password" id="iKeyFH" placeholder="キーを入力..." style="flex:1"/>
+        <button id="btnShowFH" style="flex-shrink:0;padding:8px 10px;white-space:nowrap">表示</button>
+      </div>
+    </div>
+  </div>
+
+  <p style="font-size:11px;color:var(--t3);margin-bottom:6px">▼ 銘柄・指数を選択または入力（クリックで即切替）</p>
+  <div id="chipWrap" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px"></div>
+  <div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap">
+    <div style="flex:1;min-width:200px">
+      <input type="text" id="iSym" placeholder="直接入力してEnter: AAPL / ^N225 / 7203.T ..." style="width:100%"/>
+    </div>
+    <div style="display:flex;gap:8px;flex-shrink:0">
+      <button class="btn-p" id="btnFetch">▶ 表示</button>
+      <button id="btnReload">↻ 再取得</button>
+    </div>
+  </div>
+  <p style="font-size:10px;color:var(--t3);margin-top:6px;line-height:1.5">
+    Yahoo Finance: ^GSPC, ^N225, AAPL, 7203.T など　|　Alpha Vantage: AAPL, MSFT, SPY など（指数コードは非対応・ETFで代替）
+  </p>
+  <div id="historyWrap" style="display:none;margin-top:10px;padding-top:10px;border-top:.5px solid var(--bd)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <span style="font-size:11px;color:var(--t3)">🕘 最近検索した銘柄</span>
+      <button id="btnClearHist" style="font-size:10px;padding:2px 8px;color:var(--t3)">履歴をクリア</button>
+    </div>
+    <div id="historyChips" style="display:flex;flex-wrap:wrap;gap:5px"></div>
+  </div>
+</div>
+
+<!-- データ基盤メタ情報（GitHub Pages / JSON連携時に表示） -->
+<div id="pagesMeta" style="display:none;margin-bottom:10px;padding:8px 14px;background:var(--bg2);border:.5px solid var(--bd);border-radius:var(--r);font-size:11px;color:var(--t2);line-height:1.6"></div>
+
+<!-- データ品質・取得失敗通知バナー -->
+<div id="qualityBanner" style="display:none;margin-bottom:14px;padding:12px 16px;background:rgba(216,144,48,.10);border:.5px solid rgba(216,144,48,.45);border-radius:var(--r)">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:6px">
+    <span style="font-size:13px;font-weight:600;color:#E8A94B">⚠ データ取得に一部失敗しました</span>
+    <span style="display:flex;gap:8px">
+      <button id="btnManualInput" style="font-size:11px;padding:4px 12px">✏️ 手動入力</button>
+      <button id="btnQualityClose" style="font-size:11px;padding:4px 10px;color:var(--t3)">閉じる</button>
+    </span>
+  </div>
+  <div id="qualityList" style="font-size:12px;line-height:1.8;color:var(--t1)"></div>
+</div>
+
+<!-- 手動データ入力モーダル -->
+<div id="manualModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--bg2);border:.5px solid var(--bd2);border-radius:var(--rl);max-width:460px;width:100%;padding:22px;max-height:85vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <h2 style="font-size:16px;font-weight:600">✏️ 指標の手動入力</h2>
+      <button id="btnManualClose" style="font-size:12px;padding:4px 10px">✕</button>
+    </div>
+    <p style="font-size:11px;color:var(--t2);line-height:1.6;margin-bottom:14px">
+      API取得に失敗した指標を手動で補完できます。値はこのブラウザ（localStorage）に日付付きで保存され、
+      入力から<b>3日間</b>スコア計算の代替値として使用されます。空欄の項目は使用されません。
+    </p>
+    <div id="manualFields"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      <button id="btnManualClear" style="font-size:12px;padding:7px 14px;color:var(--t3)">全クリア</button>
+      <button id="btnManualSave" class="btn-p" style="font-size:13px;padding:8px 20px">保存して再計算</button>
+    </div>
+  </div>
+</div>
+
+<!-- Loading -->
+<div id="dLoad" style="display:none;text-align:center;padding:48px 0;color:var(--t2);font-size:14px">
+  <div class="spinner"></div>データを取得・計算中...
+</div>
+<div class="err" id="dErr" style="display:none"></div>
+
+<!-- Result -->
+<div id="dResult" style="display:none">
+  <!-- Header price -->
+  <div class="panel" style="padding:14px 18px">
+    <div id="priceRow" style="display:flex;gap:14px;align-items:baseline;flex-wrap:wrap"></div>
+    <p id="asOf" style="font-size:13px;color:var(--t2);margin-top:5px"></p>
+  </div>
+
+  <!-- ═══ LAYER 1: 市場レジーム ═══ -->
+  <div class="layer-head">
+    <div class="layer-num">1</div>
+    <div class="layer-title">市場レジーム（Market Regime）</div>
+    <div class="layer-sub">売買シグナルではなく市場環境の診断・他レイヤーの配点調整に使用</div>
+  </div>
+  <div class="panel">
+    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:14px">
+      <div id="regimePill" class="regime-pill"></div>
+      <div style="flex:1;min-width:160px">
+        <div class="bar-w" style="width:100%;height:9px">
+          <div class="bar-f" id="regimeBar" style="width:0%"></div>
+        </div>
+      </div>
+      <div id="regimeScoreTxt" style="font-size:20px;font-weight:700;font-family:'Courier New',monospace"></div>
+    </div>
+    <div class="info-g" id="regimeGrid" style="grid-template-columns:repeat(5,1fr)"></div>
+  </div>
+
+  <!-- ═══ LAYER 2: スコア計算（市場行動） ═══ -->
+  <div class="layer-head">
+    <div class="layer-num">2</div>
+    <div class="layer-title">スコア計算（市場行動）</div>
+    <div class="layer-sub">価格・出来高・ボラティリティ・勢い</div>
+  </div>
+  <div class="panel">
+    <div class="dual-gauge" style="margin-bottom:16px">
+      <div class="gbox">
+        <p style="font-size:12px;color:var(--t2);margin-bottom:4px">Bottom Score（大底スコア）</p>
+        <div id="gaugeBottom"></div>
+      </div>
+      <div class="gbox">
+        <p style="font-size:12px;color:var(--t2);margin-bottom:4px">Top Score（天井スコア）</p>
+        <div id="gaugeTop"></div>
+      </div>
+    </div>
+    <div id="layer2Tables"></div>
+  </div>
+
+  <!-- ═══ LAYER 3: 反転確認 ═══ -->
+  <div class="layer-head">
+    <div class="layer-num">3</div>
+    <div class="layer-title">反転確認（Confirmation）</div>
+    <div class="layer-sub">ダイバージェンス検出</div>
+  </div>
+  <div class="panel">
+    <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+      <div id="gaugeConfirm" style="flex-shrink:0"></div>
+      <div style="flex:1;min-width:200px" id="confirmList"></div>
+    </div>
+  </div>
+
+  <!-- ═══ LAYER 4: 市場心理 ═══ -->
+  <div class="layer-head">
+    <div class="layer-num">4</div>
+    <div class="layer-title">市場心理（Market Psychology）</div>
+    <div class="layer-sub">VIX・Put/Call・Fear&amp;Greed・新高値新安値</div>
+  </div>
+  <div class="panel">
+    <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+      <div id="gaugePsych" style="flex-shrink:0"></div>
+      <div style="flex:1;min-width:200px" id="psychList"></div>
+    </div>
+  </div>
+
+  <!-- ═══ LAYER 5: 総合判定 ═══ -->
+  <div class="layer-head">
+    <div class="layer-num">5</div>
+    <div class="layer-title">総合判定（Overall）</div>
+    <div class="layer-sub">0=大底 / 100=天井</div>
+  </div>
+  <div class="panel" style="text-align:center;padding:20px 12px 16px">
+    <div id="gaugeSvg"></div>
+    <div id="verdict" class="verdict"></div>
+    <div class="conf-row" style="justify-content:center;margin-top:14px">
+      <div>
+        <p style="font-size:11px;color:var(--t2)">Confidence（自信）</p>
+        <div class="conf-num" id="confNum"></div>
+      </div>
+      <div style="width:140px">
+        <div class="bar-w" style="width:100%;height:9px">
+          <div class="bar-f" id="confBar" style="width:0%;background:#534AB7"></div>
+        </div>
+        <p id="confNote" style="font-size:11px;color:var(--t3);margin-top:5px;text-align:left"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Score History -->
+  <p class="sec" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+    <span>スコア推移（Layer2+3のみ・感情指標含まず）</span>
+    <span style="display:flex;gap:4px">
+      <button class="chip on" id="hist1w" style="padding:3px 12px;font-size:11px">1週間</button>
+      <button class="chip" id="hist1m" style="padding:3px 12px;font-size:11px">1ヶ月</button>
+    </span>
+  </p>
+  <div class="panel" id="histPanel" style="padding:14px">
+    <div id="histChart"></div>
+  </div>
+
+  <!-- Info -->
+  <p class="sec">価格・移動平均</p>
+  <div class="info-g" id="infoGrid"></div>
+
+  <!-- AI用テキスト出力 -->
+  <div style="margin-top:22px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+      <p class="sec" style="margin:0">📋 AIチャット用テキスト出力</p>
+      <div style="display:flex;gap:8px">
+        <button id="btnGenReport" style="font-size:12px;padding:6px 14px">テキスト生成</button>
+        <button id="btnCopy" style="font-size:12px;padding:6px 14px;display:none" class="btn-p">コピー ✓</button>
+      </div>
+    </div>
+    <textarea id="reportBox" readonly
+      style="width:100%;height:340px;background:var(--bg2);border:.5px solid var(--bd2);border-radius:var(--r);
+             color:var(--t1);font-family:var(--mono);font-size:12px;line-height:1.65;
+             padding:14px;resize:vertical;outline:none;display:none"
+      placeholder="「テキスト生成」を押すと、AIチャットへ貼り付け可能なレポートが生成されます。"></textarea>
+    <p style="font-size:10px;color:var(--t3);margin-top:6px" id="copyNote" style="display:none"></p>
+  </div>
+
+  <div style="margin-top:18px">
+    <p class="foot">※ 本ツールは教育・参考目的です。AIによる生成テキストは一切含みません。投資判断は自己責任でお願いします。</p>
+  </div>
+</div>
+
+</div><!-- /wrap -->
+
+<script>
+/* ═══════════════════════════════════════════════
+   CONFIG / STATE
+═══════════════════════════════════════════════ */
+// Weights defined in wt object inside renderResult
+let src='yahoo';
+let avKey=localStorage.getItem('sp500k_av')||'';
+let fhKey=localStorage.getItem('sp500k_fh')||'';
+
+// 銘柄プリセット（Yahoo / Alpha Vantage 用シンボルを個別管理）
+const PRESETS=[
+  {id:'sp500', label:'S&P 500',  y:'^GSPC', a:'SPY',   name:'S&P 500'},
+  {id:'ndx',   label:'Nasdaq',   y:'^IXIC', a:'QQQ',   name:'Nasdaq 100'},
+  {id:'dji',   label:'NYダウ',   y:'^DJI',  a:'DIA',   name:'Dow Jones'},
+  {id:'n225',  label:'日経225',  y:'^N225', a:'EWJ',   name:'日経平均'},
+  {id:'nvda',  label:'NVDA',     y:'NVDA',  a:'NVDA',  name:'NVIDIA'},
+  {id:'aapl',  label:'AAPL',     y:'AAPL',  a:'AAPL',  name:'Apple'},
+  {id:'msft',  label:'MSFT',     y:'MSFT',  a:'MSFT',  name:'Microsoft'},
+  {id:'tsla',  label:'TSLA',     y:'TSLA',  a:'TSLA',  name:'Tesla'},
+  {id:'amzn',  label:'AMZN',     y:'AMZN',  a:'AMZN',  name:'Amazon'},
+  {id:'meta',  label:'META',     y:'META',  a:'META',  name:'Meta'},
+  {id:'googl', label:'GOOGL',    y:'GOOGL', a:'GOOGL', name:'Alphabet'},
+  {id:'brk',   label:'BRK.B',    y:'BRK-B', a:'BRK-B', name:'Berkshire'},
+  {id:'gold',  label:'金(GLD)',   y:'GLD',   a:'GLD',   name:'SPDR Gold'},
+  {id:'btc',   label:'BTC-USD',  y:'BTC-USD',a:'',     name:'Bitcoin'},
+];
+let activePst=PRESETS[0];
+
+// ── データキャッシュ（再取得ボタン以外では再フェッチしない）──
+const dataCache=new Map(); // key: "src|symbol" → {raw,sentiment,market,result,historical}
+function cacheKeyFor(srcVal,symObj){
+  const code=(srcVal==='yahoo'||srcVal==='json')?symObj.y
+            :srcVal==='av'?(symObj.a||symObj.y)
+            :(symObj.fh||symObj.a||symObj.y);
+  return srcVal+'|'+code;
+}
+
+/* ═══════════════════════════════════════════════
+   CONFIG — バックテスト・チューニング用パラメータ集約
+   重みや係数はすべてここで管理し、コード本体に直書きしない
+═══════════════════════════════════════════════ */
+const CONFIG={
+  // Layer5: 各レイヤーの重み
+  layerWeights:{
+    base:0.55,           // Layer2（市場行動スコア）
+    confirmation:0.25,   // Layer3（反転確認）
+    sentiment:0.20,      // Layer4（市場心理）
+  },
+
+  // Layer1: 5 Featureの重み（合計は自動正規化）
+  regimeFeatureWeights:{
+    maSlope:    0.25,   // 長期トレンド方向（200日MA傾き）
+    adx:        0.20,   // トレンド強度（ADX）
+    ker:        0.20,   // トレンド効率（KER）
+    cloud:      0.20,   // 雲ポジション（一目均衡表）
+    maStructure:0.15,   // MA構造（50/200MA乖離・GC/DC）
+  },
+
+  // Layer2: レジームによる重み補正の最大幅
+  // Bull側(regimeScore>50): oscMult上昇・devMult低下
+  // Bear側(regimeScore<50): oscMult低下・devMult上昇
+  regimeAdjustment:{
+    oscMaxDelta:0.10,   // オシレーター系: ±10%以内
+    devMaxDelta:0.10,   // 価格乖離系: ±10%以内
+  },
+
+  // Layer2: 各指標の基本重み（合計は自動正規化）
+  layer2Weights:{
+    // 2026-07-04 更新: 4銘柄×約55,000条件のバックテスト分析に基づく再配分
+    //  - 高相関ブロック(rsi/cci/stoch/pz/ma50d, 平均|r|0.74-0.95)の合計を60→51に削減
+    //  - 予測力・独立性の高い mfi / ma50d / atr / obvMom を増量
+    //  旧: rsi:16, cci:10, stoch:8, pz:14, ma50d:12, mfi:10, volZ:6, obvMom:8, atr:6, macd:10
+    rsi:14, cci:6, stoch:6, pz:10, ma50d:15,
+    mfi:14, volZ:5, obvMom:10, atr:10, macd:10,
+  },
+
+  // Layer3: 各確認指標の重み（合計1.0になるよう設定）
+  // 将来のプライスアクション追加時はここにキーを追加し、
+  // CONFIRMATION_PLUGINSのenabledをtrueにする
+  layer3Weights:{
+    macdDiv:0.30, rsiDiv:0.30, mfiDiv:0.20, obvDiv:0.20,
+    // 将来追加用（有効化時は合計1.0になるよう再配分）
+    // pinbar:0.00, engulfing:0.00, fakeout:0.00, failedBreak:0.00,
+  },
+
+  // Layer5: Confidence計算パラメータ
+  confidence:{
+    agreementWeight:   0.45,  // レイヤー間一致度の寄与率
+    magnitudeWeight:   0.35,  // シグナル強度の寄与率
+    completenessWeight:0.20,  // データ充足度の寄与率
+    maxStdDev:         0.80,  // agreement=0とみなすstdDev上限
+    regimePenalty:     0.15,  // レジーム逆行時の最大ペナルティ
+  },
+};
+
+let histRangeDays=5; // 1週間=5営業日 / 1ヶ月=22営業日
+
+/* ═══════════════════════════════════════════════
+   データ基盤連携（GitHub Pages / JSON・失敗通知・手動入力）
+═══════════════════════════════════════════════ */
+// 指標→取得先リンク（batch/sources.py と同期。data/sources.json があればそちらを優先）
+let SOURCE_LINKS={
+  'sentiment:vix':       {label:'米VIX指数',        links:[{name:'Yahoo Finance',url:'https://finance.yahoo.com/quote/%5EVIX/history/'}]},
+  'sentiment:nk_vi':     {label:'日経VI',           links:[{name:'Yahoo Finance',url:'https://finance.yahoo.com/quote/%5ENKVI.OS/'}]},
+  'sentiment:put_call':  {label:'米プットコールレシオ',links:[{name:'MacroMicro(日次)',url:'https://en.macromicro.me/series/1651/us-put-call-ratio-index'}]},
+  'sentiment:fear_greed':{label:'Fear & Greed',     links:[{name:'CNN',url:'https://edition.cnn.com/markets/fear-and-greed'}]},
+  'fundamental:shiller_per':{label:'シラーPER',      links:[{name:'phoenixconnect',url:'https://www.phoenixconnect.jp/shiller_per'},{name:'multpl.com',url:'https://www.multpl.com/shiller-pe'}]},
+  'prices:main':         {label:'価格データ',        links:[{name:'Yahoo Finance',url:'https://finance.yahoo.com/'},{name:'Yahoo Finance JP',url:'https://finance.yahoo.co.jp/'}]},
+};
+let _pagesLatest=null, _pagesHistory=null, _pagesQuality=null;
+
+// GitHub Pages上のバッチ生成JSONを読み込む（file://直開きや未配置時は静かにスキップ）
+async function loadPagesMeta(){
+  const v=Date.now(); // キャッシュバスター（設計書8.7-5）
+  async function tryJson(path){
+    try{
+      const r=await fetch(path+'?v='+v,{cache:'no-store'});
+      if(!r.ok) return null;
+      return await r.json();
+    }catch(e){ return null; }
+  }
+  const [latest, quality, sources]=await Promise.all([
+    tryJson('data/latest.json'), tryJson('data/data_quality.json'), tryJson('data/sources.json'),
+  ]);
+  _pagesLatest=latest; _pagesQuality=quality;
+  if(sources?.sources) SOURCE_LINKS=Object.assign({},SOURCE_LINKS,sources.sources);
+  if(latest){
+    const el=document.getElementById('pagesMeta');
+    const dq=latest.data_quality||{};
+    const st=dq.status==='ok'?'🟢':dq.status==='partial'?'🟡':'🔴';
+    el.innerHTML=`📦 データ基盤connected: <b>${latest.model_version||'-'}</b>`
+      +` ｜ 更新 ${latest.updated_at||'-'} ｜ データ日 ${latest.data_date||'-'}`
+      +` ｜ 品質 ${st} ${dq.status||'-'}`;
+    el.style.display='';
+    document.getElementById('tabJson').style.borderColor='#3B82D8';
+    // バッチ側で検出済みの失敗をバナー表示
+    const issues=(dq.missing_items||[]).map(m=>({item:m.item,message:m.message,link:m.source_link}))
+      .concat((dq.warnings||[]).map(m=>({item:m.item,message:m.message,link:m.source_link,warn:true})));
+    if(issues.length) showQualityBanner(issues);
+  }
+}
+
+// ── 失敗通知バナー ──
+function linkHtmlFor(itemKey){
+  const src=SOURCE_LINKS[itemKey];
+  if(!src||!src.links) return '';
+  return src.links.map(l=>`<a href="${l.url}" target="_blank" rel="noopener" style="color:#7B74E0;margin-left:8px">↗ ${l.name}</a>`).join('');
+}
+function showQualityBanner(issues){
+  if(!issues||!issues.length) return;
+  const list=document.getElementById('qualityList');
+  list.innerHTML=issues.map(it=>{
+    const label=SOURCE_LINKS[it.item]?.label||it.item;
+    const icon=it.warn?'📝':'❌';
+    const manual=it.manualValue!=null?`<span style="color:#1D9E75;margin-left:8px">→ 手動値 ${it.manualValue} を使用中</span>`:'';
+    return `<div>${icon} <b>${label}</b>：${it.message||'取得失敗'}${manual}${linkHtmlFor(it.item)}</div>`;
+  }).join('');
+  document.getElementById('qualityBanner').style.display='';
+}
+function hideQualityBanner(){ document.getElementById('qualityBanner').style.display='none'; }
+
+// ── 手動データ入力（localStorage・3日間有効） ──
+const MANUAL_FIELDS=[
+  {key:'vix',        label:'VIX（米恐怖指数）',      hint:'例: 15.8',  min:5,  max:90,  itemKey:'sentiment:vix'},
+  {key:'nk_vi',      label:'日経VI',                hint:'例: 18.2',  min:8,  max:90,  itemKey:'sentiment:nk_vi'},
+  {key:'put_call',   label:'Put/Call Ratio',        hint:'例: 0.85',  min:0.2,max:2.5, itemKey:'sentiment:put_call'},
+  {key:'fear_greed', label:'Fear & Greed（0-100）', hint:'例: 55',    min:0,  max:100, itemKey:'sentiment:fear_greed'},
+  {key:'shiller_per',label:'シラーPER（参考表示）',   hint:'例: 32.5',  min:5,  max:60,  itemKey:'fundamental:shiller_per'},
+];
+const MANUAL_TTL_DAYS=3;
+function loadManualData(){
+  try{
+    const d=JSON.parse(localStorage.getItem('mhs_manual')||'{}');
+    const now=Date.now(), ttl=MANUAL_TTL_DAYS*86400e3;
+    let changed=false;
+    for(const k of Object.keys(d)){
+      if(!d[k]||now-(d[k].ts||0)>ttl){ delete d[k]; changed=true; }
+    }
+    if(changed) localStorage.setItem('mhs_manual',JSON.stringify(d));
+    return d;
+  }catch(e){ return {}; }
+}
+function openManualModal(){
+  const data=loadManualData();
+  document.getElementById('manualFields').innerHTML=MANUAL_FIELDS.map(f=>{
+    const cur=data[f.key];
+    const curTxt=cur?`保存済: ${cur.value}（${new Date(cur.ts).toLocaleDateString('ja-JP')}）`:'';
+    return `<div style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <label style="font-size:12px;color:var(--t1);font-weight:500">${f.label}</label>
+        <span style="font-size:10px;color:var(--t3)">${curTxt}</span>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;margin-top:4px">
+        <input type="number" step="any" id="mi_${f.key}" placeholder="${f.hint}" value="${cur?cur.value:''}"
+          style="flex:1;background:var(--bg);border:.5px solid var(--bd2);border-radius:6px;color:var(--t1);padding:8px 10px;font-size:13px;outline:none"/>
+        <span style="font-size:10px">${linkHtmlFor(f.itemKey)}</span>
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('manualModal').style.display='flex';
+}
+function saveManualModal(){
+  const data=loadManualData();
+  MANUAL_FIELDS.forEach(f=>{
+    const raw=document.getElementById('mi_'+f.key).value.trim();
+    if(raw===''){ delete data[f.key]; return; }
+    const v=parseFloat(raw);
+    if(isNaN(v)||v<f.min||v>f.max){ delete data[f.key]; return; }
+    data[f.key]={value:v,ts:Date.now()};
+  });
+  localStorage.setItem('mhs_manual',JSON.stringify(data));
+  document.getElementById('manualModal').style.display='none';
+  run(true); // 再計算
+}
+
+// ── 感情指標フォールバック統合 ──
+// 優先順位: ①ライブAPI → ②Pages JSON(latest.json) → ③手動入力
+// 置換時は _src フラグを付与し、失敗＋補完状況をバナーに集約表示する
+function applySentimentFallbacks(sentiment, market){
+  const manual=loadManualData();
+  const pj=_pagesLatest?.sentiment_latest||{};
+  const issues=[];
+  function fb(cur, jsonVal, manKey, itemKey, mk){
+    if(cur) return cur;                              // ①ライブ成功
+    if(jsonVal&&jsonVal.value!=null){                // ②Pages JSON
+      issues.push({item:itemKey,message:`ライブ取得失敗 → バッチJSON値(${jsonVal.date})で代替`,warn:true});
+      return Object.assign({_src:'json'}, mk(jsonVal.value));
+    }
+    if(manual[manKey]){                              // ③手動入力
+      issues.push({item:itemKey,message:'ライブ取得失敗',manualValue:manual[manKey].value});
+      return Object.assign({_src:'manual'}, mk(manual[manKey].value));
+    }
+    issues.push({item:itemKey,message:'取得失敗（下記リンクで確認し手動入力できます）'});
+    return null;
+  }
+  const vixItem=market==='JP'?'sentiment:nk_vi':'sentiment:vix';
+  const vixKey =market==='JP'?'nk_vi':'vix';
+  sentiment.vix=fb(sentiment.vix, market==='JP'?pj.nk_vi:pj.vix, vixKey, vixItem, v=>({price:v,name:'manual'}));
+  if(market==='US'){
+    sentiment.pcr=fb(sentiment.pcr, pj.put_call, 'put_call', 'sentiment:put_call', v=>({ratio:v}));
+    sentiment.fg =fb(sentiment.fg,  pj.fear_greed,'fear_greed','sentiment:fear_greed', v=>({score:v,rating:''}));
+  }
+  return issues;
+}
+
+// ── JSON(Pages)データソース: history_1y.json から価格系列を取得 ──
+async function fetchPages(sym){
+  if(!_pagesHistory){
+    try{
+      const r=await fetch('data/history_1y.json?v='+Date.now(),{cache:'no-store'});
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      _pagesHistory=await r.json();
+    }catch(e){
+      throw new Error('data/history_1y.json の読込に失敗しました（'+e.message+'）。\n'
+        +'GitHub Pages上で開いているか、バッチが実行済みか確認してください。\n'
+        +'ローカルで試す場合: python batch/main.py 実行後、python -m http.server で開く');
+    }
+  }
+  const entry=_pagesHistory.symbols?.[sym];
+  if(!entry||!entry.prices||entry.prices.length<55){
+    const avail=Object.keys(_pagesHistory.symbols||{}).join(', ')||'なし';
+    throw new Error(`JSON内に ${sym} のデータがありません。利用可能: ${avail}`);
+  }
+  const P=entry.prices;
+  const n=P.length;
+  return{
+    closes:P.map(p=>p.close), highs:P.map(p=>p.high??p.close),
+    lows:P.map(p=>p.low??p.close), volumes:P.map(p=>p.volume??0),
+    meta:{price:P[n-1].close, prev:P[n-2].close, symbol:sym,
+          name:sym+' (Pages JSON: '+(_pagesHistory.updated_at||'').slice(0,10)+')'}
+  };
+}
+
+// ── 検索履歴（手入力で検索した銘柄コードを記録）──
+const SRC_LABEL={yahoo:'Yahoo',av:'AlphaV',fh:'Finnhub'};
+let searchHistory=[];
+try{ searchHistory=JSON.parse(localStorage.getItem('sp500_history')||'[]'); }catch(e){ searchHistory=[]; }
+
+function saveSearchHistory(code,srcVal,name){
+  searchHistory=searchHistory.filter(h=>!(h.code===code && h.src===srcVal));
+  searchHistory.unshift({code,src:srcVal,name:name||code,ts:Date.now()});
+  searchHistory=searchHistory.slice(0,12);
+  try{ localStorage.setItem('sp500_history',JSON.stringify(searchHistory)); }catch(e){}
+  renderHistoryChips();
+}
+function renderHistoryChips(){
+  const wrap=document.getElementById('historyWrap');
+  const box=document.getElementById('historyChips');
+  if(!searchHistory.length){ wrap.style.display='none'; return; }
+  wrap.style.display='';
+  box.innerHTML=searchHistory.map((h,i)=>
+    `<button class="chip" data-i="${i}">${h.code} <span style="opacity:.55;font-size:10px">${SRC_LABEL[h.src]||h.src}</span></button>`
+  ).join('');
+  box.querySelectorAll('.chip').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const h=searchHistory[+btn.dataset.i];
+      if(!h) return;
+      src=h.src;
+      document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.s===h.src));
+      activePst=null;
+      document.getElementById('iSym').value=h.code;
+      renderChips();
+      run(false);
+    });
+  });
+}
+renderHistoryChips();
+
+/* ═══════════════════════════════════════════════
+   UI WIRING
+═══════════════════════════════════════════════ */
+// ── タブ切替（即座に表示） ──
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+    t.classList.add('on'); src=t.dataset.s;
+    updateKeyUI();
+    run(false);
+  });
+});
+// 選択中のデータソースに応じてAPIキー入力欄の表示を切り替え
+function updateKeyUI(){
+  const area=document.getElementById('dKeyArea');
+  const avBox=document.getElementById('keyAVBox');
+  const fhBox=document.getElementById('keyFHBox');
+  avBox.style.display = src==='av' ? '' : 'none';
+  fhBox.style.display = src==='fh' ? '' : 'none';
+  area.style.display = (src==='av'||src==='fh') ? '' : 'none';
+}
+updateKeyUI();
+
+// ── APIキー表示切替 ──
+function toggleShow(inputId,btnId){
+  const i=document.getElementById(inputId),b=document.getElementById(btnId);
+  i.type=i.type==='password'?'text':'password';
+  b.textContent=i.type==='password'?'表示':'隠す';
+}
+document.getElementById('btnShowAV').addEventListener('click',()=>toggleShow('iKeyAV','btnShowAV'));
+document.getElementById('btnShowFH').addEventListener('click',()=>toggleShow('iKeyFH','btnShowFH'));
+document.getElementById('iKeyAV').addEventListener('input',e=>{
+  avKey=e.target.value.trim(); localStorage.setItem('sp500k_av',avKey);
+});
+document.getElementById('iKeyFH').addEventListener('input',e=>{
+  fhKey=e.target.value.trim(); localStorage.setItem('sp500k_fh',fhKey);
+});
+
+// ── 銘柄プリセット チップ ──
+function renderChips(){
+  const wrap=document.getElementById('chipWrap');
+  wrap.innerHTML=PRESETS.map(p=>
+    `<button class="chip${activePst&&activePst.id===p.id?' on':''}" data-id="${p.id}">${p.label}</button>`
+  ).join('');
+  wrap.querySelectorAll('.chip').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      activePst=PRESETS.find(p=>p.id===btn.dataset.id);
+      document.getElementById('iSym').value='';
+      renderChips();
+      run(false);
+    });
+  });
+}
+renderChips();
+
+// 手入力時はプリセット解除、Enterで表示
+document.getElementById('iSym').addEventListener('input',e=>{
+  activePst=e.target.value.trim()?null:PRESETS[0];
+  renderChips();
+});
+document.getElementById('iSym').addEventListener('keydown',e=>{
+  if(e.key==='Enter'){ e.preventDefault(); run(false); }
+});
+
+// 現在のシンボル取得（ソース別に適切なコードを返す）
+function getCurSym(){
+  const manual=document.getElementById('iSym').value.trim().toUpperCase();
+  if(manual){
+    // 日本株コード（4桁数字 例:7203 / 数字3桁+英字1桁の新形式 例:285A〈キオクシア〉）は
+    // サフィックスなしで入力された場合、Yahoo Finance 用に自動で .T を付与する
+    const isJPCode = /^[0-9]{3}[0-9A-Z]$/.test(manual) && !manual.includes('.');
+    const yCode = isJPCode ? manual+'.T' : manual;
+    return{y:yCode, a:manual, fh:manual, name:manual};
+  }
+  if(activePst){
+    // Alpha Vantage で ^ 系コードが選ばれたとき ETF 代替を使用
+    const aCode=(src==='av'&&activePst.a)?activePst.a:activePst.y;
+    return{y:activePst.y, a:activePst.a, fh:activePst.a, name:activePst.name};
+  }
+  return{y:'^GSPC', a:'SPY', name:'S&P 500'};
+}
+
+document.getElementById('btnFetch').addEventListener('click',()=>run(false));
+document.getElementById('btnReload').addEventListener('click',()=>run(true));
+if(avKey) document.getElementById('iKeyAV').value=avKey;
+document.getElementById('btnClearHist').addEventListener('click',()=>{
+  searchHistory=[];
+  try{ localStorage.removeItem('sp500_history'); }catch(e){}
+  renderHistoryChips();
+});
+if(fhKey) document.getElementById('iKeyFH').value=fhKey;
+
+// ── データ品質バナー・手動入力モーダルの配線 ──
+document.getElementById('btnManualInput').addEventListener('click',openManualModal);
+document.getElementById('btnQualityClose').addEventListener('click',hideQualityBanner);
+document.getElementById('btnManualClose').addEventListener('click',()=>{
+  document.getElementById('manualModal').style.display='none';
+});
+document.getElementById('btnManualSave').addEventListener('click',saveManualModal);
+document.getElementById('btnManualClear').addEventListener('click',()=>{
+  try{ localStorage.removeItem('mhs_manual'); }catch(e){}
+  openManualModal(); // 再描画
+});
+document.getElementById('manualModal').addEventListener('click',e=>{
+  if(e.target.id==='manualModal') document.getElementById('manualModal').style.display='none';
+});
+// 起動時にGitHub Pages上のバッチJSONメタ情報を読込（未配置なら何もしない）
+loadPagesMeta();
+
+
+
+/* ═══════════════════════════════════════════════
+   DATA FETCHING
+═══════════════════════════════════════════════ */
+async function fetchYahoo(sym){
+  // ── Yahoo Finance を優先試行 ─────────────────────────────────────────
+  const bases=[
+    `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=2y`,
+    `https://query2.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=2y`,
+    `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=1y`,
+  ];
+  const mkProxies=[
+    u=>u,
+    u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u),
+    u=>'https://corsproxy.io/?'+encodeURIComponent(u),
+    u=>'https://api.codetabs.com/v1/proxy?quest='+encodeURIComponent(u),
+  ];
+  let lastErr='';
+  for(const base of bases){
+    for(const mk of mkProxies){
+      try{
+        const r=await fetch(mk(base));
+        if(!r.ok){lastErr='HTTP '+r.status; continue;}
+        const j=await r.json();
+        if(j.chart?.error){lastErr=j.chart.error.description||'chart error'; continue;}
+        if(!j.chart?.result?.[0]){lastErr='データなし'; continue;}
+        const res=j.chart.result[0], q=res.indicators.quote[0];
+        const dispName=res.meta.shortName||res.meta.longName||sym;
+        return{closes:q.close,highs:q.high,lows:q.low,volumes:q.volume,
+               meta:{price:res.meta.regularMarketPrice,prev:res.meta.chartPreviousClose,
+                     symbol:sym,name:dispName}};
+      }catch(e){lastErr=e.message; continue;}
+    }
+  }
+
+  // ── Stooq フォールバック ─────────────────────────────────────────────
+  // 注意: Stooqは2026年3月以降、CSV取得にAPIキーが必須となったため
+  // 無認証アクセスでは多くの場合失敗する（成功すればラッキー程度の扱い）
+  function toStooq(s){
+    const m={'^GSPC':'^spx','^IXIC':'^ndq','^DJI':'^dji','^N225':'^n225',
+             '^VIX':'^vix','^JNIV':'^jvix','SPY':'spy.us','QQQ':'qqq.us',
+             'DIA':'dia.us','GLD':'gld.us','EWJ':'ewj.us','EWH':'ewh.us',
+             'BRK-B':'brk-b.us'};
+    if(m[s]) return m[s];
+    if(s.endsWith('.T')) return s.replace('.T','.jp');
+    if(/^[A-Z]{1,5}(-[A-Z])?$/.test(s)) return s.toLowerCase()+'.us';
+    return s.toLowerCase();
+  }
+  let stooqErr='';
+  async function tryStooq(){
+    const ss=toStooq(sym);
+    const to=new Date(), fr=new Date(to-2*365*24*3600*1000);
+    const fmt=d=>d.toISOString().slice(0,10).replace(/-/g,'');
+    const url=`https://stooq.com/q/d/l/?s=${ss}&d1=${fmt(fr)}&d2=${fmt(to)}&i=d`;
+    const mks=[u=>u,
+      u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u),
+      u=>'https://corsproxy.io/?'+encodeURIComponent(u)];
+    for(const mk of mks){
+      try{
+        const r=await fetch(mk(url));
+        if(!r.ok){stooqErr='HTTP '+r.status; continue;}
+        const txt=await r.text();
+        if(!txt.trim()){stooqErr='空レスポンス'; continue;}
+        if(txt.includes('No data')||txt.includes('<html')||txt.startsWith('<')){stooqErr='APIキー要求またはシンボル未対応'; continue;}
+        const rows=txt.trim().split('\n').slice(1)
+          .map(l=>{const[dt,o,h,lv,c,v]=l.split(',');return{high:+h,low:+lv,close:+c,vol:+v||0};})
+          .filter(r=>!isNaN(r.close)&&r.close>0);
+        if(rows.length<55){stooqErr='データ不足('+rows.length+'日分)'; continue;}
+        const n=rows.length;
+        return{closes:rows.map(r=>r.close),highs:rows.map(r=>r.high),
+               lows:rows.map(r=>r.low),volumes:rows.map(r=>r.vol),
+               meta:{price:rows[n-1].close,prev:rows[n-2].close,
+                     symbol:sym,name:sym+' (Stooq)'}};
+      }catch(e){stooqErr=e.message; continue;}
+    }
+    return null;
+  }
+  const stooq=await tryStooq();
+  if(stooq) return stooq;
+
+  throw new Error(
+    `Yahoo Finance / Stooq [${sym}]: 取得失敗 (Yahoo: ${lastErr||'不明'} / Stooq: ${stooqErr||'不明'})\n`
+    +`※ Stooqは2026年3月よりCSV取得にAPIキーが必須となり利用不可な場合があります。\n`
+    +`　個別株は Alpha Vantage タブ（無料APIキー登録）の利用を推奨します。`
+  );
+}
+
+
+async function fetchAV(key, sym){
+  key=(key||'').trim();
+  if(!key) throw new Error('Alpha Vantage APIキーを入力してください。');
+  if(!sym) throw new Error('銘柄コードを入力してください。');
+  // Alpha Vantage は ^ 系の指数コードに非対応 → ETF 代替を使用
+  if(sym.startsWith('^')){
+    const map={'^GSPC':'SPY','^IXIC':'QQQ','^DJI':'DIA','^N225':'EWJ','^HSI':'EWH'};
+    const alt=map[sym]||'SPY';
+    throw new Error(`Alpha Vantage は指数コード "${sym}" に非対応です。\nETF代替として "${alt}" をプリセットから選択してください。`);
+  }
+  // outputsize=compact（直近100日）は無料で利用可能
+  const url=`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${sym}&outputsize=compact&apikey=${key}`;
+  const resp=await fetch(url);
+  if(!resp.ok) throw new Error('Alpha Vantage: HTTP '+resp.status);
+  const j=await resp.json();
+  if(j['Note'])        throw new Error('Alpha Vantage: APIコール上限（25回/日）に達しました。明日再試行してください。');
+  if(j['Information']) throw new Error('Alpha Vantage: '+j['Information']);
+  if(j['Error Message']) throw new Error('Alpha Vantage: '+j['Error Message']);
+  const ts=j['Time Series (Daily)'];
+  if(!ts) throw new Error('Alpha Vantage: データが見つかりません。レスポンス: '+JSON.stringify(j).slice(0,200));
+  const dates=Object.keys(ts).sort();
+  if(dates.length<55) throw new Error('Alpha Vantage: データが少なすぎます ('+dates.length+'日分)。');
+  const last=dates[dates.length-1], prev2=dates[dates.length-2];
+  return{
+    closes: dates.map(d=>+ts[d]['4. close']),
+    highs:  dates.map(d=>+ts[d]['2. high']),
+    lows:   dates.map(d=>+ts[d]['3. low']),
+    volumes:dates.map(d=>+ts[d]['5. volume']),
+    meta:{price:+ts[last]['4. close'],prev:+ts[prev2]['4. close'],
+          symbol:sym, name:sym}
+  };
+}
+
+async function fetchFH(key, sym){
+  key=(key||'').trim();
+  if(!key) throw new Error('Finnhub APIキーを入力してください。');
+  if(!sym) throw new Error('銘柄コードを入力してください。');
+  const to=Math.floor(Date.now()/1000);
+  const attempts=[
+    {sym:sym, days:365},
+    {sym:sym, days:730},
+    {sym:sym, days:180},
+  ];
+  let lastRaw='';
+  for(const {sym:s,days} of attempts){
+    const from=to-days*24*3600;
+    const url=`https://finnhub.io/api/v1/stock/candle?symbol=${s}&resolution=D&from=${from}&to=${to}&token=${key}`;
+    let j;
+    try{
+      const r=await fetch(url);
+      j=await r.json();
+    }catch(e){ lastRaw=e.message; continue; }
+    lastRaw=JSON.stringify(j).slice(0,200);
+    if(j.error){
+      throw new Error(
+        `Finnhub アクセス拒否: "${j.error}"\n`
+        +'無料プランでは /stock/candle が制限されています。\n'
+        +'Alpha Vantage または Yahoo Finance をお試しください。'
+      );
+    }
+    if(j.s==='no_data'||!j.c||j.c.length<55){ continue; }
+    if(j.s!=='ok'){ continue; }
+    const n=j.c.length;
+    return{
+      closes:j.c,highs:j.h,lows:j.l,volumes:j.v,
+      meta:{price:j.c[n-1],prev:j.c[n-2],symbol:sym, name:sym}
+    };
+  }
+  throw new Error(`Finnhub [${sym}]: 取得失敗。最後のレスポンス: ${lastRaw}`);
+}
+
+function detectMarket(sym){
+  if(!sym) return 'US';
+  const s=sym.toUpperCase();
+  return (s.endsWith('.T')||s==='^N225'||s==='^JNIV'||s==='EWJ'||s==='1306.T')?'JP':'US';
+}
+
+async function fetchYahooQuote(sym){
+  const bases=[
+    `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=5d`,
+    `https://query2.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=5d`,
+  ];
+  const mks=[u=>u,
+    u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u),
+    u=>'https://corsproxy.io/?'+encodeURIComponent(u)];
+  for(const base of bases) for(const mk of mks){
+    try{
+      const r=await fetch(mk(base));
+      if(!r.ok) continue;
+      const j=await r.json();
+      const res=j.chart?.result?.[0];
+      if(!res) continue;
+      return{price:res.meta.regularMarketPrice, name:res.meta.shortName||sym};
+    }catch(e){continue;}
+  }
+  return null;
+}
+
+// CNN Fear & Greed Index
+async function fetchFG(){
+  const url='https://production.dataviz.cnn.io/index/fearandgreed/graphdata';
+  const mks=[u=>u,
+    u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u),
+    u=>'https://corsproxy.io/?'+encodeURIComponent(u)];
+  for(const mk of mks){
+    try{
+      const r=await fetch(mk(url));
+      if(!r.ok) continue;
+      const j=await r.json();
+      const score=j.fear_and_greed?.score;
+      if(score==null) continue;
+      return{score:+score, rating:j.fear_and_greed?.rating||''};
+    }catch(e){continue;}
+  }
+  return null;
+}
+
+// CBOE Put/Call Ratio（エクイティ P/C = CPCE）
+async function fetchPCR(){
+  // CBOE の公開 CSV を複数 URL で試みる
+  const urls=[
+    'https://cdn.cboe.com/api/global/us_indices/daily_prices/CPCE_History.csv',
+    'https://cdn.cboe.com/data/us/futures/market-statistics/daily-market-statistics/CPCE.csv',
+  ];
+  const mks=[u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u),
+             u=>'https://corsproxy.io/?'+encodeURIComponent(u)];
+  for(const url of urls) for(const mk of mks){
+    try{
+      const r=await fetch(mk(url));
+      if(!r.ok) continue;
+      const txt=await r.text();
+      const lines=txt.trim().split('\n').filter(l=>l.trim());
+      // 最終行から P/C ratio を取得
+      const last=lines[lines.length-1].split(',');
+      const val=parseFloat(last[last.length-1]||last[1]);
+      if(!isNaN(val)&&val>0&&val<5) return{ratio:val};
+    }catch(e){continue;}
+  }
+  return null;
+}
+
+// 52週レンジ内の位置（新高値/新安値プロキシ）
+function calcHILOProxy(closes){
+  const lb=Math.min(252,closes.length);
+  const sl=closes.slice(-lb);
+  const hi=Math.max(...sl), lo=Math.min(...sl);
+  const range=hi-lo;
+  return range===0?0.5:(closes[closes.length-1]-lo)/range; // 0=底値圏 1=高値圏
+}
+
+// 感情指標まとめ取得
+async function fetchSentiment(market){
+  const vixSym=market==='JP'?'^JNIV':'^VIX';
+  // 並列取得（失敗しても他の指標に影響しない）
+  const [vixR,fgR,pcrR]=await Promise.allSettled([
+    fetchYahooQuote(vixSym),
+    market==='US'?fetchFG():Promise.resolve(null),
+    market==='US'?fetchPCR():Promise.resolve(null),
+  ]);
+  return{
+    vix: vixR.status==='fulfilled'?vixR.value:null,
+    fg:  fgR.status==='fulfilled'?fgR.value:null,
+    pcr: pcrR.status==='fulfilled'?pcrR.value:null,
+    market,
+  };
+}
+
+// ─── 感情スコアリング ─────────────────────────────
+// VIX: 高い=恐怖=底値シグナル(負), 低い=油断=天井シグナル(正)
+function scoreVIX(v,market){
+  if(v==null) return 0;
+  const vix=v.price;
+  if(vix==null) return 0;
+  const th=market==='JP'
+    ?{vl:12,l:19,h:25,vh:35}  // 日本VIX基準
+    :{vl:12,l:18,h:28,vh:40}; // 米国VIX基準
+  if(vix>=th.vh) return-8;  // 極度の恐怖 → 底値シグナル
+  if(vix>=th.h)  return-4;
+  if(vix<=th.vl) return+8;  // 極度の油断 → 天井シグナル
+  if(vix<=th.l)  return+4;
+  return 0;
+}
+// Put/Call: 高い(>1.0)=弱気=底値シグナル, 低い(<0.7)=強気=天井シグナル
+function scorePCR(v){
+  if(!v) return 0;
+  const r=v.ratio;
+  if(r>=1.2) return-6;
+  if(r>=1.0) return-3;
+  if(r<=0.65) return+6;
+  if(r<=0.80) return+3;
+  return 0;
+}
+// Fear&Greed: 0=極度の恐怖=底値, 100=極度の強欲=天井
+function scoreFG(v){
+  if(!v) return 0;
+  const sc=v.score;
+  if(sc<=15) return-4;
+  if(sc<=30) return-2;
+  if(sc>=85) return+4;
+  if(sc>=70) return+2;
+  return 0;
+}
+// HILO Proxy: 52週高値圏(>0.85)=天井, 52週安値圏(<0.15)=底値
+function scoreHILO(ratio){
+  if(ratio==null) return 0;
+  if(ratio>=0.90) return+4;
+  if(ratio>=0.75) return+2;
+  if(ratio<=0.10) return-4;
+  if(ratio<=0.25) return-2;
+  return 0;
+}
+
+// ─── 感情指標テキスト ─────────────────────────────
+function iVIX(v,market){
+  if(!v) return '取得不可';
+  const vix=v.price, jp=market==='JP';
+  if(vix==null) return '取得不可';
+  const sym=jp?'^JNIV':'^VIX';
+  if(vix>=(jp?35:40)) return`${vix.toFixed(1)} 極度の恐怖`;
+  if(vix>=(jp?25:28)) return`${vix.toFixed(1)} 恐怖`;
+  if(vix<=(jp?12:12)) return`${vix.toFixed(1)} 極度の楽観`;
+  if(vix<=(jp?19:18)) return`${vix.toFixed(1)} 楽観・油断`;
+  return`${vix.toFixed(1)} 中立`;
+}
+function iPCR(v){
+  if(!v) return '取得不可(米国のみ)';
+  const r=v.ratio;
+  if(r>=1.2) return`${r.toFixed(2)} プット優勢(弱気)`;
+  if(r>=1.0) return`${r.toFixed(2)} やや弱気`;
+  if(r<=0.65) return`${r.toFixed(2)} コール優勢(強気)`;
+  if(r<=0.80) return`${r.toFixed(2)} やや強気`;
+  return`${r.toFixed(2)} 中立`;
+}
+function iFG(v){
+  if(!v) return '取得不可(米国のみ)';
+  const s=v.score.toFixed(0),rt=v.rating||'';
+  if(v.score<=15) return`${s} 極度の恐怖`;
+  if(v.score<=30) return`${s} 恐怖`;
+  if(v.score>=85) return`${s} 極度の強欲`;
+  if(v.score>=70) return`${s} 強欲`;
+  return`${s} 中立 (${rt})`;
+}
+function iHILO(ratio){
+  if(ratio==null) return '—';
+  const p=(ratio*100).toFixed(0)+'%';
+  if(ratio>=0.90) return`${p} 52週高値圏`;
+  if(ratio>=0.75) return`${p} 高値寄り`;
+  if(ratio<=0.10) return`${p} 52週安値圏`;
+  if(ratio<=0.25) return`${p} 安値寄り`;
+  return`${p} 中間`;
+}
+
+function clean(d){
+  const{closes:C,highs:H,lows:L,volumes:V,meta}=d;
+  const ok=C.map((c,i)=>c!=null&&!isNaN(c)&&H[i]!=null&&L[i]!=null);
+  return{
+    closes:C.filter((_,i)=>ok[i]),highs:H.filter((_,i)=>ok[i]),
+    lows:L.filter((_,i)=>ok[i]),volumes:(V||[]).filter((_,i)=>ok[i]).map(v=>v||0),
+    meta
+  };
+}
+
+/* ═══════════════════════════════════════════════
+   TECHNICAL INDICATORS
+   指標一覧と重み（合計 ±100）:
+     RSI(14)          ±18  最重要・古典的
+     Z-SCORE(50d)     ±14  統計的客観性
+     MACDダイバージェンス ±12  価格/MACD乖離
+     MFI(14)          ±11  出来高加重
+     CCI(20)          ±11  チャネル指数
+     50日MA乖離率      ±10  過熱・過冷
+     OBVダイバージェンス ±9  出来高/価格乖離
+     Stochastic%K     ±7   短期タイミング
+     Volume Z-SCORE   ±5   出来高異常
+     ATR比率          ±2   ボラティリティ
+     200日MA乖離率    ±1   長期トレンド
+     ──────────────   ±100
+═══════════════════════════════════════════════ */
+function smaLast(arr,n){
+  if(arr.length<n) return null;
+  return arr.slice(-n).reduce((a,b)=>a+b,0)/n;
+}
+function emaArr(arr,n){
+  const res=new Array(arr.length).fill(null);
+  const k=2/(n+1);
+  let s=0; for(let i=0;i<n;i++) s+=arr[i];
+  res[n-1]=s/n;
+  for(let i=n;i<arr.length;i++) res[i]=arr[i]*k+res[i-1]*(1-k);
+  return res;
+}
+// RSI (Wilder's smoothing)
+function calcRSI(C,p=14){
+  if(C.length<p*2+1) return null;
+  let ag=0,al=0;
+  for(let i=1;i<=p;i++){const d=C[i]-C[i-1];if(d>0)ag+=d;else al-=d;}
+  ag/=p; al/=p;
+  for(let i=p+1;i<C.length;i++){
+    const d=C[i]-C[i-1],g=Math.max(d,0),l=Math.max(-d,0);
+    ag=(ag*(p-1)+g)/p; al=(al*(p-1)+l)/p;
+  }
+  return al===0?100:100-100/(1+ag/al);
+}
+// CCI (Commodity Channel Index)
+function calcCCI(H,L,C,p=20){
+  if(C.length<p) return null;
+  const tp=C.map((_,i)=>(H[i]+L[i]+C[i])/3);
+  const sl=tp.slice(-p), mn=sl.reduce((a,b)=>a+b,0)/p;
+  const md=sl.reduce((a,b)=>a+Math.abs(b-mn),0)/p;
+  if(md===0) return 0;
+  const ltp=(H[C.length-1]+L[C.length-1]+C[C.length-1])/3;
+  return(ltp-mn)/(0.015*md);
+}
+// Linear slope (linear regression slope, normalised)
+function linSlope(arr){
+  const n=arr.length, mx=(n-1)/2;
+  const my=arr.reduce((a,b)=>a+b,0)/n;
+  let num=0,den=0;
+  arr.forEach((y,i)=>{num+=(i-mx)*(y-my);den+=(i-mx)**2;});
+  return den===0?0:num/den;
+}
+// MACD Divergence (slope-based: 25-bar linear regression)
+function calcMACDDiv(C,fast=12,slow=26,sig=9,lb=25){
+  if(C.length<slow+sig+lb) return null;
+  const ef=emaArr(C,fast), es=emaArr(C,slow);
+  const ml=C.map((_,i)=>ef[i]!=null&&es[i]!=null?ef[i]-es[i]:null);
+  const vm=ml.filter(v=>v!=null);
+  if(vm.length<lb) return null;
+  const pSl=C.slice(-lb), mSl=vm.slice(-lb);
+  const pRng=(Math.max(...pSl)-Math.min(...pSl))||1;
+  const mAbs=Math.max(...mSl.map(Math.abs))||1;
+  const pN=linSlope(pSl)/pRng*lb;
+  const mN=linSlope(mSl)/mAbs*lb;
+  const cur=vm[vm.length-1];
+  if(pN>0.08&&mN<-0.08) return{type:'bearish',note:'弱気ダイバージェンス',cur};
+  if(pN<-0.08&&mN>0.08) return{type:'bullish',note:'強気ダイバージェンス',cur};
+  if(pN>0)               return{type:'none',   note:'方向一致↑',cur};
+  return                        {type:'none',   note:'方向一致↓',cur};
+}
+// OBV Divergence (slope-based: 25-bar)
+function calcOBVDiv(C,V,lb=25){
+  if(C.length<lb+1) return null;
+  let obv=0; const oa=[0];
+  for(let i=1;i<C.length;i++){
+    if(C[i]>C[i-1]) obv+=V[i]; else if(C[i]<C[i-1]) obv-=V[i];
+    oa.push(obv);
+  }
+  const pSl=C.slice(-lb), oSl=oa.slice(-lb);
+  const pRng=(Math.max(...pSl)-Math.min(...pSl))||1;
+  const oAbs=Math.max(...oSl.map(Math.abs))+1;
+  const pN=linSlope(pSl)/pRng*lb;
+  const oN=linSlope(oSl)/oAbs*lb;
+  if(pN>0.08&&oN<-0.08) return{type:'bearish',note:'弱気ダイバージェンス'};
+  if(pN<-0.08&&oN>0.08) return{type:'bullish',note:'強気ダイバージェンス'};
+  if(pN>0)               return{type:'none',   note:'方向一致↑'};
+  return                        {type:'none',   note:'方向一致↓'};
+}
+// MFI (Money Flow Index)
+function calcMFI(H,L,C,V,p=14){
+  if(C.length<p+1) return null;
+  const tp=C.map((c,i)=>(H[i]+L[i]+c)/3);
+  let pm=0,nm=0;
+  for(let i=C.length-p;i<C.length;i++){
+    const mf=tp[i]*V[i];
+    if(tp[i]>tp[i-1]) pm+=mf; else nm+=mf;
+  }
+  return nm===0?100:100-100/(1+pm/nm);
+}
+// Stochastic %K
+function calcStoch(H,L,C,p=14){
+  if(C.length<p) return null;
+  const sh=H.slice(-p),sl=L.slice(-p);
+  const hi=Math.max(...sh),lo=Math.min(...sl);
+  return hi===lo?50:(C[C.length-1]-lo)/(hi-lo)*100;
+}
+// Price Z-Score (50d)
+function calcPriceZ(C,p=50){
+  if(C.length<p) return null;
+  const sl=C.slice(-p), m=sl.reduce((a,b)=>a+b,0)/p;
+  const std=Math.sqrt(sl.reduce((a,b)=>a+Math.pow(b-m,2),0)/p);
+  return std===0?0:(C[C.length-1]-m)/std;
+}
+// Volume Z-Score (20d)
+function calcVolZ(V,p=20){
+  if(V.length<p) return null;
+  const sl=V.slice(-p), m=sl.reduce((a,b)=>a+b,0)/p;
+  const std=Math.sqrt(sl.reduce((a,b)=>a+Math.pow(b-m,2),0)/p);
+  return std===0?0:(V[V.length-1]-m)/std;
+}
+// 50日MA乖離率
+function calcMA50Dev(C){
+  const m=smaLast(C,50); return m?(C[C.length-1]-m)/m*100:null;
+}
+// 200日MA乖離率
+function calcMA200Dev(C){
+  const m=smaLast(C,200); return m?(C[C.length-1]-m)/m*100:null;
+}
+// ATR比率 (with MA50-based direction)
+function calcATR(H,L,C,atrP=14,avgP=20){
+  if(C.length<atrP+avgP) return null;
+  const trs=[];
+  for(let i=1;i<C.length;i++)
+    trs.push(Math.max(H[i]-L[i],Math.abs(H[i]-C[i-1]),Math.abs(L[i]-C[i-1])));
+  const cur=trs.slice(-atrP).reduce((a,b)=>a+b,0)/atrP;
+  const hist=trs.slice(-(atrP+avgP),-atrP);
+  const ha=hist.length?hist.reduce((a,b)=>a+b,0)/hist.length:cur;
+  const ratio=ha===0?1:cur/ha, pct=cur/C[C.length-1]*100;
+  const ma50=smaLast(C,50);
+  const dir=ma50?(C[C.length-1]>ma50?1:-1):0;
+  return{ratio,pct,dir};
+}
+
+/* ═══════════════════════════════════════════════
+   LAYER 1: 市場レジーム (Market Regime)
+   ── 5項目を独立したFeatureとして保持し、
+      それらからRegime Scoreを算出する。
+      各Featureスコアは0〜100（50=中立,0=強ベア,100=強ブル）。
+      バックテスト時に各Featureの寄与率・重みを個別調整可能。
+═══════════════════════════════════════════════ */
+
+// ─── Layer1 指標計算関数（復元）──────────────────────────────────────
+function wilderSmooth(arr,p){
+  const out=new Array(arr.length).fill(null);
+  let s=0; for(let i=0;i<p;i++) s+=arr[i];
+  out[p-1]=s;
+  for(let i=p;i<arr.length;i++) out[i]=out[i-1]-out[i-1]/p+arr[i];
+  return out;
+}
+function calcADX(H,L,C,p=14){
+  if(C.length<p*3) return null;
+  const n=C.length, plusDM=[],minusDM=[],TR=[];
+  for(let i=1;i<n;i++){
+    const up=H[i]-H[i-1], dn=L[i-1]-L[i];
+    plusDM.push(up>dn&&up>0?up:0);
+    minusDM.push(dn>up&&dn>0?dn:0);
+    TR.push(Math.max(H[i]-L[i],Math.abs(H[i]-C[i-1]),Math.abs(L[i]-C[i-1])));
+  }
+  const smTR=wilderSmooth(TR,p), smP=wilderSmooth(plusDM,p), smM=wilderSmooth(minusDM,p);
+  const dx=[];
+  for(let i=p-1;i<TR.length;i++){
+    if(smTR[i]==null||smTR[i]===0){dx.push(0);continue;}
+    const pdi=100*smP[i]/smTR[i], mdi=100*smM[i]/smTR[i];
+    dx.push((pdi+mdi)===0?0:100*Math.abs(pdi-mdi)/(pdi+mdi));
+  }
+  if(dx.length<p) return null;
+  let adx=dx.slice(0,p).reduce((a,b)=>a+b,0)/p;
+  for(let i=p;i<dx.length;i++) adx=(adx*(p-1)+dx[i])/p;
+  return adx;
+}
+function calcKER(C,p=10){
+  if(C.length<p+1) return null;
+  const change=Math.abs(C[C.length-1]-C[C.length-1-p]);
+  let vol=0;
+  for(let i=C.length-p;i<C.length;i++) vol+=Math.abs(C[i]-C[i-1]);
+  return vol===0?0:change/vol;
+}
+function calcMA200Slope(C,lookback=20){
+  if(C.length<200+lookback) return null;
+  const now=smaLast(C,200);
+  const prev=smaLast(C.slice(0,C.length-lookback),200);
+  if(now==null||prev==null||prev===0) return null;
+  return (now-prev)/prev*100;
+}
+function calcIchimokuCloud(H,L,C){
+  const n=C.length;
+  function donchianMid(p,endIdx){
+    if(endIdx-p+1<0) return null;
+    const hs=H.slice(endIdx-p+1,endIdx+1), ls=L.slice(endIdx-p+1,endIdx+1);
+    return (Math.max(...hs)+Math.min(...ls))/2;
+  }
+  const lastIdx=n-1, cloudIdx=lastIdx-26;
+  if(cloudIdx<52) return null;
+  const tenkanP=donchianMid(9,cloudIdx), kijunP=donchianMid(26,cloudIdx);
+  if(tenkanP==null||kijunP==null) return null;
+  const senkouA=(tenkanP+kijunP)/2;
+  const senkouB=donchianMid(52,cloudIdx);
+  if(senkouB==null) return null;
+  const top=Math.max(senkouA,senkouB), bot=Math.min(senkouA,senkouB);
+  const price=C[lastIdx];
+  return{pos:price>top?'above':price<bot?'below':'in',senkouA,senkouB,top,bot,price};
+}
+function calcMAStructure(ma50,ma200){
+  if(ma50==null||ma200==null) return null;
+  return{cross:ma50>=ma200?'golden':'death', devPct:(ma50-ma200)/ma200*100};
+}
+
+// ─── Layer1 Feature スコアリング関数 ──────────────────────────────────
+// Feature1: 長期トレンド方向（200日MA傾き）
+function featureSlopeScore(slope){
+  if(slope==null) return 50;
+  return Math.round(Math.max(0,Math.min(100, 50+slope/3*50)));
+}
+// Feature2: トレンド強度（ADX × 方向性）
+function featureADXScore(adx,slope){
+  if(adx==null) return 50;
+  const dir=slope==null?0:(slope>0?1:-1);
+  const power=Math.max(0,(adx-20)/20); // adx<20=0, adx=40=1
+  return Math.round(Math.max(0,Math.min(100, 50+dir*power*30)));
+}
+// Feature3: トレンド効率（KER × 方向性）
+function featureKERScore(ker,slope){
+  if(ker==null) return 50;
+  const dir=slope==null?0:(slope>0?1:-1);
+  const eff=Math.max(-0.5,Math.min(1,(ker-0.3)/0.4));
+  return Math.round(Math.max(0,Math.min(100, 50+dir*eff*25)));
+}
+// Feature4: 雲ポジション（一目均衡表）
+function featureCloudScore(cloud){
+  if(!cloud) return 50;
+  if(cloud.pos==='above') return 80;
+  if(cloud.pos==='below') return 20;
+  return 50;
+}
+// Feature5: MA構造（50/200MA GC/DC + 乖離率）
+function featureMAStructureScore(maStruct){
+  if(!maStruct) return 50;
+  const spread=Math.min(1,Math.abs(maStruct.devPct)/10);
+  const base=maStruct.cross==='golden'?65:35;
+  const adj=(maStruct.cross==='golden'?1:-1)*spread*20;
+  return Math.round(Math.max(5,Math.min(95,base+adj)));
+}
+
+// ─── Regime 計算 ──────────────────────────────────────────────────────
+function classifyRegime(slope,adx,ker,cloud,maStruct,atrV){
+  const W=CONFIG.regimeFeatureWeights;
+  // 5 Featureを独立したオブジェクトとして保持（バックテスト可能構造）
+  const features={
+    trendDirection: featureSlopeScore(slope),          // 長期トレンド方向
+    trendStrength:  featureADXScore(adx,slope),        // トレンド強度
+    trendEfficiency:featureKERScore(ker,slope),         // トレンド効率
+    cloudPosition:  featureCloudScore(cloud),           // 雲ポジション
+    maStructure:    featureMAStructureScore(maStruct),  // MA構造
+  };
+
+  // Regime Score = 加重平均（CONFIG.regimeFeatureWeightsで個別調整可）
+  const wSum=W.maSlope+W.adx+W.ker+W.cloud+W.maStructure;
+  const rawScore=(
+    features.trendDirection *W.maSlope+
+    features.trendStrength  *W.adx+
+    features.trendEfficiency*W.ker+
+    features.cloudPosition  *W.cloud+
+    features.maStructure    *W.maStructure
+  )/wSum;
+  const score=Math.round(rawScore*10)/10;
+
+  // Feature間の標準偏差（低=5指標が一致→高確信レジーム）
+  const fVals=Object.values(features);
+  const fMean=fVals.reduce((a,b)=>a+b,0)/fVals.length;
+  const fVar=fVals.reduce((a,b)=>a+(b-fMean)**2,0)/fVals.length;
+  const fStdDev=Math.sqrt(fVar);
+
+  const atrRatio=atrV?atrV.ratio:1;
+  let type,label,color;
+  if(atrRatio>=1.8&&score>38&&score<62){
+    type='volatility';  label='ボラティリティレジーム';   color='#8B5CF6';
+  }else if(score>=68){
+    type='trend_bull';  label='トレンドレジーム（ブル）'; color='#3B82D8';
+  }else if(score<=32){
+    type='trend_bear';  label='トレンドレジーム（ベア）'; color='#D85A30';
+  }else if(score>=55){
+    type='range_bull';  label='レンジ（ブル寄り）';       color='#6B9AE8';
+  }else if(score<=45){
+    type='range_bear';  label='レンジ（ベア寄り）';       color='#E88B6B';
+  }else{
+    type='range';       label='レンジレジーム';           color='#7878a0';
+  }
+
+  return{
+    score,type,label,color,
+    features,           // ★ 5 Feature独立スコア（バックテスト用に保持）
+    featureStdDev:Math.round(fStdDev*10)/10,
+    components:{slope,adx,ker,cloud,maStruct,atrRatio},
+  };
+}
+
+function iRegimeSlope(s){
+  if(s==null)return'データ不足(200日MA要)';
+  if(s>=1.5)return`+${s.toFixed(2)}% 強い上向き`;
+  if(s>=0.3)return`+${s.toFixed(2)}% 上向き`;
+  if(s<=-1.5)return`${s.toFixed(2)}% 強い下向き`;
+  if(s<=-0.3)return`${s.toFixed(2)}% 下向き`;
+  return`${s.toFixed(2)}% 横ばい`;
+}
+function iADX(v){
+  if(v==null)return'—';
+  if(v>=40)return`${v.toFixed(1)} 非常に強いトレンド`;
+  if(v>=25)return`${v.toFixed(1)} 強いトレンド`;
+  if(v>=20)return`${v.toFixed(1)} トレンド形成中`;
+  return`${v.toFixed(1)} トレンドなし(レンジ)`;
+}
+function iKER(v){
+  if(v==null)return'—';
+  if(v>=0.6)return`${v.toFixed(2)} 高効率（強トレンド）`;
+  if(v>=0.3)return`${v.toFixed(2)} 中程度`;
+  return`${v.toFixed(2)} 低効率（レンジ的）`;
+}
+function iCloud(c){
+  if(!c)return'データ不足';
+  if(c.pos==='above')return'雲の上（強気）';
+  if(c.pos==='below')return'雲の下（弱気）';
+  return'雲の中（中立・もみ合い）';
+}
+function iMAStruct(m){
+  if(!m)return'データ不足';
+  const cr=m.cross==='golden'?'ゴールデンクロス':'デッドクロス';
+  return`${cr} (50/200MA乖離 ${m.devPct>=0?'+':''}${m.devPct.toFixed(2)}%)`;
+}
+
+/* ═══════════════════════════════════════════════
+   LAYER 2: スコア計算（市場行動）
+   CONFIG.layer2Weightsで各指標の基本重みを管理。
+   レジームによる重み補正は±CONFIG.regimeAdjustment以内に限定。
+═══════════════════════════════════════════════ */
+// ─── Layer2 指標計算関数（復元）──────────────────────────────────────
+// 指標値 → 方向性エクストリーム度 -1(大底寄り)〜+1(天井寄り)
+function ext(v,neu,p100,n100,pow=0.7){
+  if(v==null) return 0;
+  if(v>=neu){const t=Math.min(1,(v-neu)/(p100-neu));return Math.pow(t,pow);}
+  const t=Math.min(1,(neu-v)/(neu-n100));return-Math.pow(t,pow);
+}
+function clamp1(v){return Math.max(-1,Math.min(1,v));}
+
+// MACD ヒストグラム全系列（Layer2用：勢いの極端さ評価）
+function calcMACDFull(C,fast=12,slow=26,sig=9){
+  if(C.length<slow+sig+5) return null;
+  const ef=emaArr(C,fast), es=emaArr(C,slow);
+  const ml=C.map((_,i)=>ef[i]!=null&&es[i]!=null?ef[i]-es[i]:null);
+  const vm=ml.filter(v=>v!=null);
+  const se=emaArr(vm,sig);
+  const sf=new Array(C.length).fill(null);
+  let vi=0; for(let i=0;i<C.length;i++) if(ml[i]!=null) sf[i]=se[vi++];
+  const hist=ml.map((v,i)=>v!=null&&sf[i]!=null?v-sf[i]:null);
+  return{ml,sl:sf,hist};
+}
+// MACDヒストグラムのZスコア（現在値を直近履歴と比較）
+function calcMACDMomentumZ(C){
+  const m=calcMACDFull(C); if(!m) return null;
+  const h=m.hist.filter(v=>v!=null);
+  if(h.length<30) return null;
+  const win=h.slice(-50);
+  const cur=win[win.length-1], hist=win.slice(0,-1);
+  const mean=hist.reduce((a,b)=>a+b,0)/hist.length;
+  const sd=Math.sqrt(hist.reduce((a,b)=>a+(b-mean)**2,0)/hist.length);
+  return sd===0?0:(cur-mean)/sd;
+}
+// OBVの傾きZスコア（ダイバージェンスではなく「OBV勢い」の異常度）
+function calcOBVMomentum(C,V,slopeWin=10,zWin=50){
+  if(C.length<zWin+slopeWin+5) return null;
+  let obv=0; const oa=[0];
+  for(let i=1;i<C.length;i++){
+    if(C[i]>C[i-1]) obv+=V[i]; else if(C[i]<C[i-1]) obv-=V[i];
+    oa.push(obv);
+  }
+  const slopes=[];
+  for(let i=slopeWin;i<oa.length;i++){
+    slopes.push(linSlope(oa.slice(i-slopeWin,i+1)));
+  }
+  if(slopes.length<10) return null;
+  const cur=slopes[slopes.length-1], hist=slopes.slice(0,-1);
+  const mean=hist.reduce((a,b)=>a+b,0)/hist.length;
+  const sd=Math.sqrt(hist.reduce((a,b)=>a+(b-mean)**2,0)/hist.length);
+  return sd===0?0:(cur-mean)/sd;
+}
+
+function computeLayer2(C,H,L,V,regime){
+  const cur=C[C.length-1], pch=(cur-C[C.length-2])/C[C.length-2]*100;
+  const W=CONFIG.layer2Weights;
+
+  const rsiV  =calcRSI(C,14);
+  const cciV  =calcCCI(H,L,C,20);
+  const stochV=calcStoch(H,L,C,14);
+  const pzV   =calcPriceZ(C,50);
+  const ma50d =calcMA50Dev(C);
+  const mfiV  =calcMFI(H,L,C,V,14);
+  const volZ  =calcVolZ(V,20);
+  const obvMomZ=calcOBVMomentum(C,V);
+  const atrV  =calcATR(H,L,C,14,20);
+  const macdMomZ=calcMACDMomentumZ(C);
+
+  const items=[
+    {name:'RSI(14)',         cat:'price', val:rsiV,    e:ext(rsiV,50,100,0),                    type:'osc', disp:fv2(rsiV,1),    i:iRSI(rsiV),    w:W.rsi},
+    {name:'CCI(20)',         cat:'price', val:cciV,    e:cciV==null?0:clamp1(cciV/200),          type:'osc', disp:cciV!=null?fv2(cciV,1):'—', i:iCCI(cciV), w:W.cci},
+    {name:'Stochastic%K(14)',cat:'price', val:stochV,  e:ext(stochV,50,100,0),                   type:'osc', disp:fv2(stochV,1),  i:iStoch(stochV),w:W.stoch},
+    {name:'Z-SCORE(50d)',    cat:'price', val:pzV,     e:pzV==null?0:clamp1(pzV/2.5),            type:'dev', disp:fp2(pzV,2),     i:iPZ(pzV),      w:W.pz},
+    {name:'50日MA乖離率',    cat:'price', val:ma50d,   e:ma50d==null?0:clamp1(ma50d/12),         type:'dev', disp:fp2(ma50d,2)+'%',i:iDev(ma50d,'50日MA'),w:W.ma50d},
+    {name:'MFI(14)',         cat:'volume',val:mfiV,    e:ext(mfiV,50,100,0),                     type:'osc', disp:fv2(mfiV,1),    i:iMFI(mfiV),    w:W.mfi},
+    {name:'Volume Z-SCORE',  cat:'volume',val:volZ,    e:(volZ==null||volZ<0.5)?0:clamp1((pch>=0?1:-1)*Math.min(1,(volZ-0.5)/2.5)),type:'neu',disp:fp2(volZ,2),i:iVolZ(volZ),w:W.volZ},
+    {name:'OBV',             cat:'volume',val:obvMomZ, e:obvMomZ==null?0:clamp1(obvMomZ/2.5),   type:'neu', disp:obvMomZ!=null?fp2(obvMomZ,2)+'σ':'—',i:iOBVMom(obvMomZ),w:W.obvMom},
+    {name:'ATR比率',         cat:'vol',   val:atrV,    e:(!atrV||atrV.ratio<=1)?0:clamp1(atrV.dir*Math.min(1,(atrV.ratio-1)/0.8)),type:'neu',disp:atrV?atrV.ratio.toFixed(2)+'x':'—',i:iATR(atrV),w:W.atr},
+    {name:'MACD',            cat:'mom',   val:macdMomZ,e:macdMomZ==null?0:clamp1(macdMomZ/2),   type:'osc', disp:macdMomZ!=null?fp2(macdMomZ,2)+'σ':'—',i:iMACDMom(macdMomZ),w:W.macd},
+  ];
+
+  // レジーム適応型重み補正（±oscMaxDelta/devMaxDelta 以内に限定）
+  const regimeDir=(regime?regime.score-50:0)/50; // -1(強ベア)〜+1(強ブル)
+  const adj=CONFIG.regimeAdjustment;
+  const oscMult=1+regimeDir*adj.oscMaxDelta;
+  const devMult=1-regimeDir*adj.devMaxDelta;
+  items.forEach(it=>{
+    it.mult=it.type==='osc'?oscMult:it.type==='dev'?devMult:1;
+    it.adjW=it.w*it.mult;
+  });
+
+  const totalW=items.reduce((a,b)=>a+b.adjW,0);
+  let topSum=0,bottomSum=0;
+  items.forEach(it=>{
+    topSum   +=Math.max(0, it.e)*it.adjW;
+    bottomSum+=Math.max(0,-it.e)*it.adjW;
+  });
+  const topScore   =Math.round(Math.max(0,Math.min(100,totalW?topSum/totalW*100:0))*10)/10;
+  const bottomScore=Math.round(Math.max(0,Math.min(100,totalW?bottomSum/totalW*100:0))*10)/10;
+
+  const CATS=[
+    {key:'price', label:'価格系'},
+    {key:'volume',label:'出来高系'},
+    {key:'vol',   label:'ボラティリティ'},
+    {key:'mom',   label:'勢い'},
+  ];
+  return{
+    topScore,bottomScore,items,
+    categories:CATS.map(c=>({label:c.label,items:items.filter(it=>it.cat===c.key)})),
+    regimeMult:{oscMult,devMult},
+  };
+}
+// ─── Layer2 解釈テキスト関数（復元）─────────────────────────────────
+function iRSI(v){
+  if(v==null)return'—';
+  if(v>=80)return'強く買われすぎ';if(v>=70)return'買われすぎ圏';if(v>=60)return'やや高め';
+  if(v<=20)return'強く売られすぎ';if(v<=30)return'売られすぎ圏';if(v<=40)return'やや低め';
+  return'中立';
+}
+function iPZ(v){
+  if(v==null)return'—';
+  if(v>=2.5)return'統計的極高値(>2.5σ)';if(v>=2)return'統計的過熱(>2σ)';if(v>=1)return'やや高め';
+  if(v<=-2.5)return'統計的極安値(<-2.5σ)';if(v<=-2)return'統計的過売(<-2σ)';if(v<=-1)return'やや低め';
+  return'平均付近';
+}
+function iCCI(v){
+  if(v==null)return'—';
+  if(v>=200)return'強い買われすぎ(>200)';if(v>=100)return'買われすぎ(>100)';
+  if(v<=-200)return'強い売られすぎ(<-200)';if(v<=-100)return'売られすぎ(<-100)';
+  return'中立';
+}
+function iDev(v,label='50日MA'){
+  if(v==null)return'—';
+  if(v>=10)return`${label}大幅上方乖離`;if(v>=5)return`${label}上方乖離`;
+  if(v<=-10)return`${label}大幅下方乖離`;if(v<=-5)return`${label}下方乖離`;
+  return`${label}付近`;
+}
+function iMFI(v){
+  if(v==null)return'—';
+  if(v>=80)return'買われすぎ(出来高過熱)';if(v>=70)return'やや過熱';
+  if(v<=20)return'売られすぎ(出来高枯渇)';if(v<=30)return'やや低め';
+  return'中立';
+}
+function iStoch(v){
+  if(v==null)return'—';
+  if(v>=80)return'買われすぎ';if(v<=20)return'売られすぎ';return'中立';
+}
+function iVolZ(v){
+  if(v==null)return'—';
+  if(v>=2)return'出来高急増(+2σ超)';if(v>=1)return'出来高増加';
+  if(v<=-1)return'出来高減少';return'平均的';
+}
+function iATR(a){
+  if(!a)return'—';
+  const s=a.ratio>=1.5?`高ボラ(${a.dir>0?'天井警戒':'底値警戒'})`:a.ratio>=1.2?'やや高め':'通常範囲';
+  return`${a.ratio.toFixed(2)}x ${s}`;
+}
+
+function iOBVMom(z){
+  if(z==null)return'データ不足';
+  if(z>=2)return`+${z.toFixed(2)}σ 出来高急増(買い優勢)`;
+  if(z>=1)return`+${z.toFixed(2)}σ 買い圧力やや強い`;
+  if(z<=-2)return`${z.toFixed(2)}σ 出来高急増(売り優勢)`;
+  if(z<=-1)return`${z.toFixed(2)}σ 売り圧力やや強い`;
+  return'通常範囲';
+}
+function iMACDMom(z){
+  if(z==null)return'データ不足';
+  if(z>=2)return`+${z.toFixed(2)}σ 上昇モメンタム極端`;
+  if(z>=1)return`+${z.toFixed(2)}σ 上昇モメンタム強`;
+  if(z<=-2)return`${z.toFixed(2)}σ 下落モメンタム極端`;
+  if(z<=-1)return`${z.toFixed(2)}σ 下落モメンタム強`;
+  return'通常範囲';
+}
+
+
+/* ═══════════════════════════════════════════════
+   LAYER 3: 反転確認（Confirmation）
+   ダイバージェンスに加え、将来的にプライスアクション
+   （ピンバー・包み足・フェイクアウト・安値更新失敗等）も
+   同一プラグイン構造で追加できる設計。
+   enabled:false のプラグインはスコア計算から除外。
+═══════════════════════════════════════════════ */
+
+// ─── ダイバージェンス計算 ─────────────────────────────────────────────
+function calcRSIDiv(C,p=14,lb=25){
+  if(C.length<p*2+lb+5) return null;
+  const series=[];
+  for(let i=C.length-lb;i<C.length;i++){
+    const r=calcRSI(C.slice(0,i+1),p);
+    if(r==null) return null;
+    series.push(r);
+  }
+  const priceSl=C.slice(-lb);
+  const pRng=(Math.max(...priceSl)-Math.min(...priceSl))||1;
+  const rRng=(Math.max(...series)-Math.min(...series))||1;
+  const pN=linSlope(priceSl)/pRng*lb, rN=linSlope(series)/rRng*lb;
+  const cur=series[series.length-1];
+  if(pN>0.08&&rN<-0.08) return{type:'bearish',note:'弱気ダイバージェンス',cur};
+  if(pN<-0.08&&rN>0.08) return{type:'bullish',note:'強気ダイバージェンス',cur};
+  return{type:'none',note:pN>0?'方向一致↑':'方向一致↓',cur};
+}
+function calcMFIDiv(H,L,C,V,p=14,lb=25){
+  if(C.length<p*2+lb+5) return null;
+  const series=[];
+  for(let i=C.length-lb;i<C.length;i++){
+    const m=calcMFI(H.slice(0,i+1),L.slice(0,i+1),C.slice(0,i+1),V.slice(0,i+1),p);
+    if(m==null) return null;
+    series.push(m);
+  }
+  const priceSl=C.slice(-lb);
+  const pRng=(Math.max(...priceSl)-Math.min(...priceSl))||1;
+  const mRng=(Math.max(...series)-Math.min(...series))||1;
+  const pN=linSlope(priceSl)/pRng*lb, mN=linSlope(series)/mRng*lb;
+  const cur=series[series.length-1];
+  if(pN>0.08&&mN<-0.08) return{type:'bearish',note:'弱気ダイバージェンス',cur};
+  if(pN<-0.08&&mN>0.08) return{type:'bullish',note:'強気ダイバージェンス',cur};
+  return{type:'none',note:pN>0?'方向一致↑':'方向一致↓',cur};
+}
+
+// ─── 確認プラグイン定義 ──────────────────────────────────────────────
+// enabled:true のプラグインのみスコア計算に参加する。
+// 将来的なプライスアクション追加手順:
+//   1. compute 関数を実装（戻り値: {type:'bearish'|'bullish'|'none', note:string}|null）
+//   2. CONFIG.layer3Weights に対応キーを追加（合計が1.0になるよう他を調整）
+//   3. enabled:true に変更
+const CONFIRMATION_PLUGINS=[
+  {id:'macdDiv',name:'MACDダイバージェンス',enabled:true,
+   compute:(C,H,L,V)=>calcMACDDiv(C,12,26,9,25),
+   weight:()=>CONFIG.layer3Weights.macdDiv},
+  {id:'rsiDiv', name:'RSIダイバージェンス', enabled:true,
+   compute:(C,H,L,V)=>calcRSIDiv(C,14,25),
+   weight:()=>CONFIG.layer3Weights.rsiDiv},
+  {id:'mfiDiv', name:'MFIダイバージェンス', enabled:true,
+   compute:(C,H,L,V)=>calcMFIDiv(H,L,C,V,14,25),
+   weight:()=>CONFIG.layer3Weights.mfiDiv},
+  {id:'obvDiv', name:'OBVダイバージェンス', enabled:true,
+   compute:(C,H,L,V)=>calcOBVDiv(C,V,25),
+   weight:()=>CONFIG.layer3Weights.obvDiv},
+  // ── プライスアクション（将来追加用・現在は無効）──────────────────
+  // {id:'pinbar',     name:'ピンバー',          enabled:false,
+  //  compute:(C,H,L,V)=>null, weight:()=>CONFIG.layer3Weights.pinbar||0},
+  // {id:'engulfing',  name:'包み足',            enabled:false,
+  //  compute:(C,H,L,V)=>null, weight:()=>CONFIG.layer3Weights.engulfing||0},
+  // {id:'fakeout',    name:'フェイクアウト',     enabled:false,
+  //  compute:(C,H,L,V)=>null, weight:()=>CONFIG.layer3Weights.fakeout||0},
+  // {id:'failedBreak',name:'安値/高値更新失敗',  enabled:false,
+  //  compute:(C,H,L,V)=>null, weight:()=>CONFIG.layer3Weights.failedBreak||0},
+];
+
+function computeLayer3(C,H,L,V){
+  const active=CONFIRMATION_PLUGINS.filter(p=>p.enabled);
+  const items=active.map(p=>{
+    let d=null;
+    try{ d=p.compute(C,H,L,V); }catch(e){}
+    return{name:p.name,id:p.id,d,w:p.weight()};
+  });
+  const wSum=items.reduce((a,b)=>a+b.w,0)||1;
+  let raw=0;
+  items.forEach(it=>{
+    if(it.d?.type==='bearish') raw+=it.w;
+    else if(it.d?.type==='bullish') raw-=it.w;
+  });
+  const score=Math.round(Math.max(0,Math.min(100, 50+raw/wSum*50))*10)/10;
+  return{score,items};
+}
+
+/* ═══════════════════════════════════════════════
+   LAYER 4: 市場心理
+   VIX / Put-Call Ratio / Fear&Greed / 新高値新安値比率
+   0〜100、50=中立、低いほど恐怖(大底寄り)、高いほど強欲(天井寄り)
+═══════════════════════════════════════════════ */
+function computeLayer4(sentiment,hiloProxy,market){
+  const vixS=scoreVIX(sentiment.vix,market), vixOk=sentiment.vix?.price!=null;
+  const pcrS=scorePCR(sentiment.pcr), pcrOk=!!sentiment.pcr;
+  const fgS=scoreFG(sentiment.fg), fgOk=!!sentiment.fg;
+  const hiloS=scoreHILO(hiloProxy), hiloOk=hiloProxy!=null;
+  const tag=o=>o?._src==='manual'?' ✏️手動':o?._src==='json'?' 📦JSON':'';
+  const items=[
+    {name:'VIX'+(market==='JP'?'(^JNIV)':'(^VIX)'), maxW:8, s:vixS, ok:vixOk, disp:(vixOk?sentiment.vix.price.toFixed(1):'取得不可')+tag(sentiment.vix), i:iVIX(sentiment.vix,market)},
+    {name:'Put/Call Ratio', maxW:6, s:pcrS, ok:pcrOk, disp:(pcrOk?sentiment.pcr.ratio.toFixed(2):'取得不可(米国のみ)')+tag(sentiment.pcr), i:iPCR(sentiment.pcr)},
+    {name:'Fear & Greed',   maxW:4, s:fgS,  ok:fgOk,  disp:(fgOk?sentiment.fg.score.toFixed(0):'取得不可(米国のみ)')+tag(sentiment.fg), i:iFG(sentiment.fg)},
+    {name:'新高値新安値比率(proxy)', maxW:4, s:hiloS, ok:hiloOk, disp:hiloOk?(hiloProxy*100).toFixed(0)+'%':'—', i:iHILO(hiloProxy)},
+  ];
+  const availMax=items.filter(it=>it.ok).reduce((a,b)=>a+b.maxW,0);
+  const rawSum=items.reduce((a,b)=>a+b.s,0);
+  const score=availMax===0?50:Math.round(Math.max(0,Math.min(100,50+rawSum/availMax*50))*10)/10;
+  return{score,items,availMax};
+}
+
+/* ═══════════════════════════════════════════════
+   LAYER 5: 総合判定（Overall Confidence）
+   加重平均だけでなく、レイヤー間のAgreement（一致度）を
+   連続値（分散ベース）で評価してConfidenceを算出する。
+   ・Bottom/Top Score高くてもConfirmation低ければConfidence低
+   ・Bottom・Confirmation・Sentimentが揃えばConfidence高
+═══════════════════════════════════════════════ */
+function computeLayer5(layer2,layer3,layer4,regime){
+  const W=CONFIG.layerWeights;
+  const hasL4=layer4.availMax>0;
+  const layer2Net=50+(layer2.topScore-layer2.bottomScore)/2;
+
+  // 各レイヤーを「票」に変換（-1=大底寄り, 0=中立, +1=天井寄り）
+  const votes=[
+    {v:(layer2Net-50)/50,   w:W.base,         label:'Layer2'},
+    {v:(layer3.score-50)/50,w:W.confirmation, label:'Layer3'},
+    ...(hasL4?[{v:(layer4.score-50)/50,w:W.sentiment,label:'Layer4'}]:[]),
+  ];
+  const wSum=votes.reduce((a,b)=>a+b.w,0);
+
+  // 加重スコア
+  const rawVote=votes.reduce((a,b)=>a+b.v*b.w,0)/wSum;
+  const finalScore=Math.round(Math.max(0,Math.min(100,50+rawVote*50))*10)/10;
+
+  // ── Agreement（連続値・分散ベース）──────────────────────────────────
+  // stdDev=0 → 全レイヤーが完全一致（Confidence最大化）
+  // stdDev≥maxStdDev → 全レイヤーが不一致（Confidence最小化）
+  const vVals=votes.map(x=>x.v);
+  const vMean=vVals.reduce((a,b)=>a+b,0)/vVals.length;
+  const vVariance=vVals.reduce((a,b)=>a+(b-vMean)**2,0)/vVals.length;
+  const vStdDev=Math.sqrt(vVariance);
+  const Cv=CONFIG.confidence;
+  const agreement=Math.max(0,1-vStdDev/Cv.maxStdDev);
+
+  // 例: Bottom90・Conf20 → votes=[+0.8, -0.6] → stdDev大 → agreement低
+  //     Bottom90・Conf90・Sent90 → votes=[+0.8, +0.8, +0.8] → stdDev=0 → agreement=1
+
+  const magnitude=Math.abs(vMean);              // シグナル強度 0〜1
+  const completeness=hasL4?1.0:0.85;           // データ充足度
+
+  let confRaw=Cv.agreementWeight*agreement
+             +Cv.magnitudeWeight*magnitude
+             +Cv.completenessWeight*completeness;
+
+  // レジーム逆行ペナルティ（連続値: opposition強いほど大きいペナルティ）
+  const regimeDelta=(regime?regime.score-50:0)/50; // -1〜+1
+  const scoreDelta=(finalScore-50)/50;              // -1〜+1
+  const opposition=-regimeDelta*scoreDelta;          // 正=逆方向
+  const opposesTrend=opposition>0.1;
+  if(opposition>0) confRaw-=Cv.regimePenalty*(opposition**0.7);
+
+  const confidence=Math.round(Math.max(5,Math.min(95,confRaw*100)));
+
+  return{
+    score:finalScore,confidence,layer2Net,
+    agreement:Math.round(agreement*100)/100,
+    magnitude:Math.round(magnitude*100)/100,
+    vStdDev:Math.round(vStdDev*1000)/1000,
+    vVariance:Math.round(vVariance*1000)/1000,
+    votes,opposesTrend,
+    weights:{w2:W.base/wSum,w3:W.confirmation/wSum,w4:hasL4?W.sentiment/wSum:0},
+  };
+}
+
+/* ═══════════════════════════════════════════════
+   ANALYSIS ENGINE（5層統合）
+═══════════════════════════════════════════════ */
+function analyse({closes:C,highs:H,lows:L,volumes:V,meta},sentiment={},market){
+  const n=C.length;
+  if(n<55) throw new Error(`データ不足 (${n}日分)。最低55日必要。`);
+  const cur=C[n-1], prv=C[n-2], pch=(cur-prv)/prv*100;
+  const ma50=smaLast(C,50), ma200=smaLast(C,200);
+  const mk=market||'US';
+
+  // ── Layer 1: 市場レジーム ──
+  const slope=calcMA200Slope(C,20);
+  const adx=calcADX(H,L,C,14);
+  const ker=calcKER(C,10);
+  const cloud=calcIchimokuCloud(H,L,C);
+  const maStruct=calcMAStructure(ma50,ma200);
+  const atrV=calcATR(H,L,C,14,20);
+  const regime=classifyRegime(slope,adx,ker,cloud,maStruct,atrV);
+
+  // ── Layer 2: スコア計算（市場行動）──
+  const layer2=computeLayer2(C,H,L,V,regime);
+
+  // ── Layer 3: 反転確認 ──
+  const layer3=computeLayer3(C,H,L,V);
+
+  // ── Layer 4: 市場心理 ──
+  const hiloProxy=calcHILOProxy(C);
+  const layer4=computeLayer4(sentiment,hiloProxy,mk);
+
+  // ── Layer 5: 総合判定 ──
+  const layer5=computeLayer5(layer2,layer3,layer4,regime);
+
+  return{
+    layer1:regime, layer2, layer3, layer4, layer5,
+    info:{cur,prev:meta.prev,pch,n,symbol:meta.symbol,name:meta.name,ma50,ma200,market:mk}
+  };
+}
+
+/* ═══════════════════════════════════════════════
+   HISTORICAL SCORE（推移グラフ用）
+   感情指標(Layer4)は過去データ取得が困難なため除外し、
+   Layer2(市場行動)+Layer3(反転確認)のみで
+   各日時点のLayer5相当スコアを遡及計算する。
+═══════════════════════════════════════════════ */
+function computeHistoricalScores(C,H,L,V,maxDays=30){
+  const n=C.length, minWindow=80; // ADX/KER等を考慮しやや多めに確保
+  const days=Math.min(maxDays, n-minWindow);
+  if(days<=0) return[];
+  const out=[];
+  for(let i=n-days;i<n;i++){
+    const c=C.slice(0,i+1), h=H.slice(0,i+1), l=L.slice(0,i+1), v=V.slice(0,i+1);
+    if(c.length<minWindow) continue;
+    let regime=null;
+    try{
+      const slope=calcMA200Slope(c,20), adx=calcADX(h,l,c,14), ker=calcKER(c,10);
+      const cloud=calcIchimokuCloud(h,l,c);
+      const ma50=smaLast(c,50), ma200=smaLast(c,200);
+      const maStruct=calcMAStructure(ma50,ma200);
+      const atrV=calcATR(h,l,c,14,20);
+      regime=classifyRegime(slope,adx,ker,cloud,maStruct,atrV);
+    }catch(e){ regime=null; }
+    const l2=computeLayer2(c,h,l,v,regime);
+    const l3=computeLayer3(c,h,l,v);
+    const layer2Net=50+(l2.topScore-l2.bottomScore)/2;
+    const w2=0.69,w3=0.31; // w4除外分を w2:w3 = 0.55:0.25 の比で再配分
+    const total=Math.round(Math.max(0,Math.min(100,w2*layer2Net+w3*l3.score))*10)/10;
+    out.push({offset:n-1-i, total, price:c[c.length-1]});
+  }
+  return out;
+}
+
+/* ═══════════════════════════════════════════════
+   RENDERING HELPERS
+═══════════════════════════════════════════════ */
+function verdictInfo(s){
+  if(s>=85)return{t:'天井圏 — 強い天井シグナル',c:'#D85A30',bg:'rgba(216,90,48,.15)',bd:'rgba(216,90,48,.4)'};
+  if(s>=65)return{t:'やや天井気味 — 要注意',    c:'#BA7517',bg:'rgba(186,117,23,.15)',bd:'rgba(186,117,23,.4)'};
+  if(s>=55)return{t:'やや過熱 — 慎重に',        c:'#9A7510',bg:'rgba(154,117,16,.12)',bd:'rgba(154,117,16,.35)'};
+  if(s<=15)return{t:'大底圏 — 強い大底シグナル',c:'#1D9E75',bg:'rgba(29,158,117,.15)',bd:'rgba(29,158,117,.4)'};
+  if(s<=35)return{t:'やや底値気味 — 注目',      c:'#178060',bg:'rgba(23,128,96,.15)', bd:'rgba(23,128,96,.4)'};
+  if(s<=45)return{t:'やや売られ過ぎ — 様子見',  c:'#157060',bg:'rgba(21,112,96,.12)', bd:'rgba(21,112,96,.35)'};
+  return{t:'中立 — 方向感なし',c:'#6060a0',bg:'rgba(70,70,140,.1)',bd:'rgba(70,70,140,.3)'};
+}
+function scoreColor(s){ // s:0-100, 50=中立(グレー), 0=緑(大底), 100=赤(天井)
+  const t=Math.max(0,Math.min(100,s))/100;
+  if(t<0.5){const h=148-(148-55)*(t/0.5);return`hsl(${h},68%,37%)`;}
+  const h=55-(55-13)*((t-0.5)/0.5); return`hsl(${h},72%,42%)`;
+}
+function fp2(v,d=2){if(v==null)return'—';return(v>=0?'+':'')+v.toFixed(d);}
+function fv2(v,d=2){if(v==null)return'—';return v.toFixed(d);}
+
+// 小型セミゲージ（Layer1/2/3/4 共通）
+function renderSmallGauge(score,color,sublabel){
+  const cx=110,cy=92,r=76,arcLen=Math.PI*r;
+  const pct=Math.max(0,Math.min(1,score/100));
+  return`<svg viewBox="0 0 220 116" width="100%" style="max-width:220px">
+    <path d="M ${cx-r},${cy} A ${r},${r} 0 0,1 ${cx+r},${cy}" fill="none" stroke="#181e32" stroke-width="14" stroke-linecap="round"/>
+    <path d="M ${cx-r},${cy} A ${r},${r} 0 0,1 ${cx+r},${cy}" fill="none" stroke="${color}" stroke-width="14" stroke-linecap="round"
+      stroke-dasharray="${arcLen}" stroke-dashoffset="${arcLen*(1-pct)}"/>
+    <text x="${cx}" y="${cy-14}" text-anchor="middle" fill="${color}" font-size="30" font-weight="700" font-family="'Courier New',monospace">${Math.round(score)}</text>
+    ${sublabel?`<text x="${cx}" y="${cy+10}" text-anchor="middle" fill="#9090b0" font-size="11">${sublabel}</text>`:''}
+  </svg>`;
+}
+// 大型ゲージ（Layer5 総合判定）
+function renderGauge(score){
+  const cx=220,cy=186,r=158,color=scoreColor(score);
+  const bgPath=`M ${cx-r},${cy} A ${r},${r} 0 0,1 ${cx+r},${cy}`;
+  const pct=Math.max(0,Math.min(1,score/100));
+  function apt(p){const a=Math.PI*(1-p);return{x:cx+r*Math.cos(a),y:cy-r*Math.sin(a)};}
+  let act='';
+  if(pct>0.005){
+    const a1=apt(0),a2=apt(pct);
+    // 塗りつぶし範囲は常に180°以下なので large-arc-flag は常に0
+    act=`<path d="M ${a1.x},${a1.y} A ${r},${r} 0 0,1 ${a2.x},${a2.y}" fill="none" stroke="${color}" stroke-width="20" stroke-linecap="round"/>`;
+  }
+  const ticks=[0,25,50,75,100].map(v=>{
+    const p=v/100, a=Math.PI*(1-p);
+    const tx=cx+(r+24)*Math.cos(a), ty=cy-(r+24)*Math.sin(a);
+    return`<text x="${tx}" y="${ty}" text-anchor="middle" dominant-baseline="middle" fill="#404060" font-size="13" font-family="'Courier New',monospace">${v}</text>`;
+  }).join('');
+  const lp=apt(0.03), rp=apt(0.97);
+  return`<svg viewBox="0 0 440 215" width="100%" style="max-width:440px">
+    <path d="${bgPath}" fill="none" stroke="#181e32" stroke-width="20" stroke-linecap="round"/>
+    ${act}${ticks}
+    <text x="${cx}" y="${cy-30}" text-anchor="middle" fill="${color}" font-size="60" font-weight="600" font-family="'Courier New',monospace">${Math.round(score)}</text>
+    <text x="${lp.x-14}" y="${lp.y+20}" text-anchor="middle" fill="#1D6050" font-size="13">大底</text>
+    <text x="${rp.x+14}" y="${rp.y+20}" text-anchor="middle" fill="#8A3518" font-size="13">天井</text>
+  </svg>`;
+}
+
+/* ── スコア推移ラインチャート (0-100スケール) ── */
+function renderHistoryChart(hist,days){
+  const box=document.getElementById('histChart');
+  if(!hist||hist.length===0){
+    box.innerHTML='<p style="font-size:12px;color:var(--t2);text-align:center;padding:16px 0">データ不足のため推移を表示できません</p>';
+    return;
+  }
+  const slice=hist.slice(-days);
+  const W=680,H=200,padL=34,padR=14,padT=14,padB=26;
+  const innerW=W-padL-padR, innerH=H-padT-padB;
+  const n=slice.length;
+  const xAt=i=>padL+(n===1?innerW/2:innerW*i/(n-1));
+  const yAt=v=>padT+innerH*(1-v/100);
+
+  const zoneTop=`<rect x="${padL}" y="${yAt(100)}" width="${innerW}" height="${yAt(80)-yAt(100)}" fill="#D85A30" opacity="0.08"/>`;
+  const zoneBot=`<rect x="${padL}" y="${yAt(20)}" width="${innerW}" height="${yAt(0)-yAt(20)}" fill="#1D9E75" opacity="0.08"/>`;
+  const midLine=`<line x1="${padL}" y1="${yAt(50)}" x2="${W-padR}" y2="${yAt(50)}" stroke="#404060" stroke-width="1" stroke-dasharray="3,3"/>`;
+  const yticks=[100,75,50,25,0].map(v=>
+    `<text x="${padL-6}" y="${yAt(v)+4}" text-anchor="end" fill="#8888a8" font-size="10" font-family="'Courier New',monospace">${v}</text>`
+  ).join('');
+  const pts=slice.map((d,i)=>`${xAt(i)},${yAt(d.total)}`).join(' ');
+  const areaPts=`${xAt(0)},${yAt(50)} `+pts+` ${xAt(n-1)},${yAt(50)}`;
+  const lineColor='#7B74E0';
+  const dots=slice.map((d,i)=>{
+    const isLast=i===n-1, c=scoreColor(d.total);
+    return`<circle cx="${xAt(i)}" cy="${yAt(d.total)}" r="${isLast?5:3}" fill="${isLast?c:lineColor}" stroke="${isLast?'#fff':'none'}" stroke-width="${isLast?1.5:0}">
+      <title>${d.offset===0?'最新':d.offset+'営業日前'}: ${d.total}</title></circle>`;
+  }).join('');
+  const labelStep=n<=7?1:Math.ceil(n/6);
+  const xlabels=slice.map((d,i)=>{
+    if(i%labelStep!==0 && i!==n-1) return'';
+    const lab=d.offset===0?'最新':'-'+d.offset;
+    return`<text x="${xAt(i)}" y="${H-8}" text-anchor="middle" fill="#8888a8" font-size="10">${lab}</text>`;
+  }).join('');
+  const lastD=slice[n-1], lastColor=scoreColor(lastD.total);
+  const lastLabel=`<text x="${xAt(n-1)}" y="${yAt(lastD.total)-12}" text-anchor="end" fill="${lastColor}" font-size="13" font-weight="700" font-family="'Courier New',monospace">${lastD.total}</text>`;
+
+  box.innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;max-width:100%">
+    ${zoneTop}${zoneBot}${midLine}${yticks}
+    <polygon points="${areaPts}" fill="${lineColor}" opacity="0.08"/>
+    <polyline points="${pts}" fill="none" stroke="${lineColor}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    ${dots}${lastLabel}${xlabels}
+  </svg>`;
+}
+
+function renderResult(result){
+  const{layer1,layer2,layer3,layer4,layer5,info}=result;
+  const{cur,prev,pch,n,symbol,name,ma50,ma200,market:mk}=info;
+
+  // ── 価格ヘッダー ──
+  const pc=pch>=0?'#1D9E75':'#D85A30';
+  document.getElementById('priceRow').innerHTML=`
+    <span style="font-size:24px;font-weight:700;color:var(--t1)">${cur.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
+    <span style="color:${pc};font-size:16px;font-weight:600">${fp2(pch,2)}%</span>`;
+  document.getElementById('asOf').textContent=`${name} (${symbol}) · ${n}営業日分 · ${mk==='JP'?'日本市場':'米国市場'}`;
+
+  /* ═══ LAYER 1 ═══ */
+  document.getElementById('regimePill').textContent=layer1.label;
+  Object.assign(document.getElementById('regimePill').style,{
+    background:layer1.color+'26', color:layer1.color, border:`.5px solid ${layer1.color}66`});
+  document.getElementById('regimeScoreTxt').textContent=layer1.score.toFixed(1);
+  document.getElementById('regimeScoreTxt').style.color=layer1.color;
+  Object.assign(document.getElementById('regimeBar').style,{width:layer1.score+'%',background:layer1.color});
+  const rc=layer1.components;
+  document.getElementById('regimeGrid').innerHTML=[
+    {l:'200日MA傾き', v:iRegimeSlope(rc.slope)},
+    {l:'ADX(14)強度', v:iADX(rc.adx)},
+    {l:'効率比(KER)',  v:iKER(rc.ker)},
+    {l:'一目雲ポジション', v:iCloud(rc.cloud)},
+    {l:'MA構造(50/200)', v:iMAStruct(rc.maStruct)},
+  ].map(c=>`<div class="info-c"><div class="ls">${c.l}</div><div style="font-size:13px;color:var(--t1);margin-top:2px;line-height:1.4">${c.v}</div></div>`).join('');
+
+  /* ═══ LAYER 2 ═══ */
+  document.getElementById('gaugeBottom').innerHTML=renderSmallGauge(layer2.bottomScore,'#1D9E75','大底スコア');
+  document.getElementById('gaugeTop').innerHTML=renderSmallGauge(layer2.topScore,'#D85A30','天井スコア');
+
+  const catLabel={price:'価格系',volume:'出来高系',vol:'ボラティリティ',mom:'勢い'};
+  let tbl=`<div style="overflow-x:auto"><table class="ind-t"><thead><tr>
+    <th>指標</th><th>現在値</th><th>方向性</th><th style="text-align:right">重み(調整後)</th><th>解釈</th>
+  </tr></thead><tbody>`;
+  layer2.categories.forEach(cat=>{
+    if(!cat.items.length) return;
+    tbl+=`<tr><td colspan="5" style="padding:6px 10px;font-size:13px;color:var(--t2);font-weight:600;background:var(--bg3);border-bottom:.5px solid var(--bd)">── ${cat.label} ──</td></tr>`;
+    cat.items.forEach(it=>{
+      const dirColor=it.e>0.08?'#D85A30':it.e<-0.08?'#1D9E75':'#707090';
+      const dirLabel=it.e>0.08?`天井寄り ${(it.e*100).toFixed(0)}%`:it.e<-0.08?`大底寄り ${(-it.e*100).toFixed(0)}%`:'中立';
+      const bw=Math.abs(it.e)*100;
+      tbl+=`<tr>
+        <td style="color:var(--t1);font-size:14px;font-weight:500">${it.name}</td>
+        <td style="font-size:14px;color:var(--t1)">${it.disp}</td>
+        <td>
+          <div style="display:flex;align-items:center;gap:6px">
+            <div class="bar-w"><div class="bar-f" style="width:${bw}%;background:${dirColor}"></div></div>
+            <span style="font-size:11px;color:${dirColor};white-space:nowrap">${dirLabel}</span>
+          </div>
+        </td>
+        <td style="text-align:right;font-size:12px;color:var(--t2);font-family:'Courier New',monospace">${it.adjW.toFixed(1)}</td>
+        <td style="font-size:13px;color:var(--t1)">${it.i}</td>
+      </tr>`;
+    });
+  });
+  tbl+=`</tbody></table></div>`;
+  tbl+=`<p style="font-size:11px;color:var(--t3);margin-top:8px;padding:0 4px">
+    レジーム適応係数: オシレーター系 ×${layer2.regimeMult.oscMult.toFixed(2)} ／ 価格乖離系 ×${layer2.regimeMult.devMult.toFixed(2)}
+    （市場レジームの強度に応じて自動調整）</p>`;
+  document.getElementById('layer2Tables').innerHTML=tbl;
+
+  /* ═══ LAYER 3 ═══ */
+  document.getElementById('gaugeConfirm').innerHTML=renderSmallGauge(layer3.score,scoreColor(layer3.score),'反転確認');
+  document.getElementById('confirmList').innerHTML=layer3.items.map(it=>{
+    const type=it.d?.type||'none';
+    const tag=type==='bearish'?{t:'弱気Div(天井)',c:'#D85A30',bg:'rgba(216,90,48,.15)'}
+              :type==='bullish'?{t:'強気Div(大底)',c:'#1D9E75',bg:'rgba(29,158,117,.15)'}
+              :{t:'なし',c:'#7878a0',bg:'rgba(120,120,160,.12)'};
+    return`<div class="div-row">
+      <span style="color:var(--t1)">${it.name}</span>
+      <span class="div-tag" style="color:${tag.c};background:${tag.bg}">${tag.t}</span>
+    </div>`;
+  }).join('');
+
+  /* ═══ LAYER 4 ═══ */
+  document.getElementById('gaugePsych').innerHTML=renderSmallGauge(layer4.score,scoreColor(layer4.score),'市場心理');
+  document.getElementById('psychList').innerHTML=layer4.items.map(it=>{
+    const c=!it.ok?'#7878a0':it.s>0.5?'#D85A30':it.s<-0.5?'#1D9E75':'#9090b0';
+    return`<div class="div-row">
+      <span style="color:var(--t1)">${it.name}</span>
+      <span style="text-align:right">
+        <span style="font-family:'Courier New',monospace;color:${c};font-size:13px">${it.disp}</span>
+        <span style="font-size:11px;color:var(--t3);margin-left:8px">${it.i}</span>
+      </span>
+    </div>`;
+  }).join('');
+
+  /* ═══ LAYER 5 ═══ */
+  document.getElementById('gaugeSvg').innerHTML=renderGauge(layer5.score);
+  const vd=verdictInfo(layer5.score);
+  const vel=document.getElementById('verdict');
+  vel.textContent=vd.t;
+  Object.assign(vel.style,{color:vd.c,background:vd.bg,border:`.5px solid ${vd.bd}`});
+  const confColor=layer5.confidence>=65?'#1D9E75':layer5.confidence>=40?'#BA7517':'#D85A30';
+  document.getElementById('confNum').textContent=layer5.confidence+'%';
+  document.getElementById('confNum').style.color=confColor;
+  Object.assign(document.getElementById('confBar').style,{width:layer5.confidence+'%',background:confColor});
+  document.getElementById('confNote').textContent=layer5.opposesTrend
+    ?'※ 市場レジームと逆方向の判定のため自信度を補正'
+    :'Layer2-4の一致度・データ充足度から算出';
+
+  // ── Info grid (50/200MA) ──
+  document.getElementById('infoGrid').innerHTML=[
+    {l:'50日MA', v:ma50?ma50.toFixed(2):'—', s:ma50?fp2((cur-ma50)/ma50*100,2)+'%':''},
+    {l:'200日MA',v:ma200?ma200.toFixed(2):'—',s:ma200?fp2((cur-ma200)/ma200*100,2)+'%':'(データ不足)'},
+    {l:'現在値',  v:cur.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}), s:fp2(pch,2)+'%(前日比)'},
+  ].map(c=>`<div class="info-c"><div class="ls">${c.l}</div><div class="lv">${c.v}</div>${c.s?`<div style="font-size:12px;color:var(--t2);margin-top:3px">${c.s}</div>`:''}</div>`).join('');
+
+  document.getElementById('dResult').style.display='';
+}
+
+let _lastResult=null; // renderResult後に保持
+
+function pad(s,n){return String(s).padEnd(n);}
+function padL(s,n){return String(s).padStart(n);}
+
+function generateReport(result){
+  const{layer1,layer2,layer3,layer4,layer5,info}=result;
+  const{cur,prev,pch,n,symbol,name,ma50,ma200,market:mk}=info;
+  const now=new Date().toLocaleString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+  const vd=verdictInfo(layer5.score);
+  const line='─'.repeat(60), dline='═'.repeat(60);
+  function pad(s,n){return String(s).padEnd(n);}
+
+  let t='';
+  t+=dline+'\n';
+  t+='  5層テクニカルスコア分析スナップショット\n';
+  t+=dline+'\n';
+  t+='取得日時 : '+now+'\n';
+  t+='銘柄     : '+name+' ('+symbol+')\n';
+  t+='市場     : '+(mk==='JP'?'日本市場':'米国市場')+'\n';
+  t+='データ数 : '+n+' 営業日分\n';
+  t+='現在値   : '+cur.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})+' (前日比 '+fp2(pch,2)+'%)\n';
+  t+=line+'\n';
+
+  t+='\n【総合判定】Layer5 Overall Score\n';
+  t+='  '+layer5.score.toFixed(1)+' / 100　→　'+vd.t+'\n';
+  t+='  （0=大底 / 50=中立 / 100=天井）\n';
+  t+='  Confidence(自信): '+layer5.confidence+'%'+(layer5.opposesTrend?'　※市場レジーム逆行のため減点':'')+'\n';
+
+  t+='\n'+line+'\n【Layer1】市場レジーム（Market Regime）\n'+line+'\n';
+  t+='  '+layer1.label+'　スコア: '+layer1.score.toFixed(1)+'/100（0=ベア,50=レンジ,100=ブル）\n';
+  const rc=layer1.components;
+  t+='  ・200日MA傾き      : '+iRegimeSlope(rc.slope)+'\n';
+  t+='  ・ADX(14)トレンド強度: '+iADX(rc.adx)+'\n';
+  t+='  ・効率比(KER)       : '+iKER(rc.ker)+'\n';
+  t+='  ・一目雲ポジション   : '+iCloud(rc.cloud)+'\n';
+  t+='  ・MA構造(50/200)    : '+iMAStruct(rc.maStruct)+'\n';
+  t+='  ※Layer2のオシレーター系/価格乖離系の重みをこのレジーム強度で自動調整済み\n';
+
+  t+='\n'+line+'\n【Layer2】スコア計算（市場行動）\n'+line+'\n';
+  t+='  Bottom Score(大底): '+layer2.bottomScore.toFixed(1)+'/100　|　Top Score(天井): '+layer2.topScore.toFixed(1)+'/100\n';
+  layer2.categories.forEach(cat=>{
+    if(!cat.items.length) return;
+    t+='\n  ── '+cat.label+' ──\n';
+    cat.items.forEach(it=>{
+      const dir=it.e>0.08?'天井寄り':it.e<-0.08?'大底寄り':'中立';
+      t+='  '+pad(it.name,20)+pad(it.disp,12)+pad(dir,10)+it.i+'\n';
+    });
+  });
+
+  t+='\n'+line+'\n【Layer3】反転確認（Confirmation）\n'+line+'\n';
+  t+='  スコア: '+layer3.score.toFixed(1)+'/100（50=なし,高い=弱気Div,低い=強気Div）\n';
+  layer3.items.forEach(it=>{
+    const type=it.d?.type||'none';
+    const lab=type==='bearish'?'弱気ダイバージェンス(天井確認)':type==='bullish'?'強気ダイバージェンス(大底確認)':'なし';
+    t+='  '+pad(it.name,22)+lab+'\n';
+  });
+
+  t+='\n'+line+'\n【Layer4】市場心理（Market Psychology）\n'+line+'\n';
+  t+='  スコア: '+layer4.score.toFixed(1)+'/100（50=中立,低い=恐怖/大底,高い=強欲/天井）\n';
+  layer4.items.forEach(it=>{
+    t+='  '+pad(it.name,20)+pad(it.disp,10)+it.i+'\n';
+  });
+
+  t+='\n'+dline+'\n';
+  t+='【AIへの質問例】\n';
+  t+='上記5層分析データ（市場レジーム／市場行動スコア／反転確認／\n';
+  t+='市場心理／総合判定）を踏まえ、'+name+'の現在の\n';
+  t+='天井・大底判断と今後の見通しについてご意見をください。\n';
+  t+=dline+'\n';
+  return t;
+}
+
+document.getElementById('btnGenReport').addEventListener('click',()=>{
+  if(!_lastResult){alert('先にデータを取得してください。');return;}
+  const txt=generateReport(_lastResult);
+  const box=document.getElementById('reportBox');
+  const copyBtn=document.getElementById('btnCopy');
+  box.value=txt;
+  box.style.display='';
+  copyBtn.style.display='';
+  copyBtn.textContent='コピー';
+  document.getElementById('copyNote').textContent=
+    '↑ テキストボックスをクリックして全選択（Ctrl+A）→ コピー、またはボタンでコピーできます。';
+  document.getElementById('copyNote').style.display='';
+  box.scrollIntoView({behavior:'smooth',block:'nearest'});
+});
+
+document.getElementById('btnCopy').addEventListener('click',()=>{
+  const box=document.getElementById('reportBox');
+  const btn=document.getElementById('btnCopy');
+  navigator.clipboard.writeText(box.value).then(()=>{
+    btn.textContent='コピー済 ✓';
+    setTimeout(()=>btn.textContent='コピー',2000);
+  }).catch(()=>{
+    // fallback
+    box.select(); document.execCommand('copy');
+    btn.textContent='コピー済 ✓';
+    setTimeout(()=>btn.textContent='コピー',2000);
+  });
+});
+
+/* ═══════════════════════════════════════════════
+   MAIN
+═══════════════════════════════════════════════ */
+async function run(force){
+  ['dResult','dErr'].forEach(id=>document.getElementById(id).style.display='none');
+  const sym=getCurSym();
+  const key=cacheKeyFor(src,sym);
+  const manualCode=document.getElementById('iSym').value.trim().toUpperCase();
+  const wasManual=manualCode!=='';
+
+  // ── キャッシュヒット時は再フェッチせず即描画 ──
+  if(!force && dataCache.has(key)){
+    const cached=dataCache.get(key);
+    _lastResult=cached.result;
+    const dispSym=src==='yahoo'?sym.y:(sym.a||sym.y);
+    document.getElementById('mainTitle').textContent=
+      (sym.name&&sym.name!==dispSym?sym.name+' ':'')+dispSym+' テクニカルスコア';
+    renderResult(cached.result);
+    renderHistoryChart(cached.historical, histRangeDays);
+    if(wasManual) saveSearchHistory(manualCode,src,cached.result.info?.name);
+    return;
+  }
+
+  document.getElementById('dLoad').style.display='';
+  ['btnFetch','btnReload'].forEach(id=>{const b=document.getElementById(id);if(b)b.disabled=true;});
+  try{
+    if(force&&src==='json') _pagesHistory=null; // 再取得時はJSONも再読込
+    const market=detectMarket(src==='yahoo'?sym.y:sym.a);
+    // メインデータと感情指標を並列取得（JSONモードは history_1y.json から）
+    const [mainR, sentR] = await Promise.allSettled([
+      (src==='json'?fetchPages(sym.y)
+       :src==='yahoo'?fetchYahoo(sym.y)
+       :src==='av'?fetchAV(avKey,sym.a||sym.y)
+       :fetchFH(fhKey,sym.fh||sym.a||sym.y)),
+      fetchSentiment(market),
+    ]);
+    if(mainR.status==='rejected') throw mainR.reason;
+    const raw=mainR.value;
+    const sentiment=sentR.status==='fulfilled'?sentR.value:{market};
+    // 感情指標の失敗を Pages JSON → 手動入力 の順で補完し、失敗通知バナーへ集約
+    hideQualityBanner();
+    const sentIssues=applySentimentFallbacks(sentiment, market);
+    if(sentIssues.length) showQualityBanner(sentIssues);
+    // ページタイトル更新
+    const dispSym=src==='yahoo'?sym.y:(sym.a||sym.y);
+    document.getElementById('mainTitle').textContent=
+      (sym.name&&sym.name!==dispSym?sym.name+' ':'')+dispSym+' テクニカルスコア';
+    const data=clean(raw);
+    const result=analyse(data,sentiment,market);
+    const historical=computeHistoricalScores(data.closes,data.highs,data.lows,data.volumes,30);
+
+    // キャッシュ保存
+    dataCache.set(key,{raw,sentiment,market,result,historical,fetchedAt:Date.now()});
+
+    _lastResult=result;  // AI出力用に保持
+    renderResult(result);
+    renderHistoryChart(historical, histRangeDays);
+    if(wasManual) saveSearchHistory(manualCode,src,result.info?.name);
+  }catch(e){
+    const el=document.getElementById('dErr');
+    el.textContent='⚠ '+e.message; el.style.display='';
+  }finally{
+    document.getElementById('dLoad').style.display='none';
+    ['btnFetch','btnReload'].forEach(id=>{const b=document.getElementById(id);if(b)b.disabled=false;});
+  }
+}
+
+// 1週間 / 1ヶ月 トグル
+document.getElementById('hist1w').addEventListener('click',()=>{
+  histRangeDays=5;
+  document.getElementById('hist1w').classList.add('on');
+  document.getElementById('hist1m').classList.remove('on');
+  const sym=getCurSym(), key=cacheKeyFor(src,sym);
+  if(dataCache.has(key)) renderHistoryChart(dataCache.get(key).historical, histRangeDays);
+});
+document.getElementById('hist1m').addEventListener('click',()=>{
+  histRangeDays=22;
+  document.getElementById('hist1m').classList.add('on');
+  document.getElementById('hist1w').classList.remove('on');
+  const sym=getCurSym(), key=cacheKeyFor(src,sym);
+  if(dataCache.has(key)) renderHistoryChart(dataCache.get(key).historical, histRangeDays);
+});
+
+</script>
+</body>
+</html>
