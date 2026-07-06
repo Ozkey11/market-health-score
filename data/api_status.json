@@ -1,9 +1,24 @@
 {
- "updated_at": "2026-07-05T21:07:39+00:00",
- "run_id": "seed-local",
- "started_at": "seed",
- "finished_at": "seed",
+ "updated_at": "2026-07-06T13:46:00+00:00",
+ "run_id": "03c331fb124b",
+ "started_at": "2026-07-06T13:45:56+00:00",
+ "finished_at": "2026-07-06T13:46:00+00:00",
  "counters": {
-  "note": "CSV seed run"
+  "prices": {
+   "ok": 8,
+   "failed": 0
+  },
+  "macro": {
+   "ok": 0,
+   "failed": 6
+  },
+  "sentiment": {
+   "ok": 2,
+   "failed": 2
+  },
+  "fundamentals": {
+   "ok": 0,
+   "failed": 1
+  }
  }
 }

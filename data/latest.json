@@ -1,12 +1,12 @@
 {
- "version": "2026-07-05-2107",
+ "version": "2026-07-06-1346",
  "model_version": "mhs-core-1.0",
- "updated_at": "2026-07-05T21:07:39+00:00",
- "data_date": "2026-07-01",
+ "updated_at": "2026-07-06T13:46:00+00:00",
+ "data_date": "2026-07-06",
  "symbol": "^GSPC",
  "price_latest": {
-  "close": 7483.24,
-  "change_pct": 0.0
+  "close": 7516.7099609375,
+  "change_pct": 0.45
  },
  "fundamental_latest": {
   "per_ttm": null,
@@ -21,11 +21,15 @@
  },
  "sentiment_latest": {
   "vix": {
-   "value": 15.81,
-   "date": "2026-07-03",
+   "value": 16.489999771118164,
+   "date": "2026-07-06",
    "is_manual": false
   },
-  "nk_vi": null,
+  "nk_vi": {
+   "value": 37.36000061035156,
+   "date": "2026-07-06",
+   "is_manual": false
+  },
   "put_call": null,
   "fear_greed": null
  },
@@ -33,20 +37,55 @@
   "status": "partial",
   "missing_items": [
    {
+    "item": "macro:DGS10",
+    "message": "FRED_API_KEY未設定（GitHub Secretsに登録してください）",
+    "source_link": "https://fred.stlouisfed.org/series/DGS10"
+   },
+   {
+    "item": "macro:DGS2",
+    "message": "FRED_API_KEY未設定（GitHub Secretsに登録してください）",
+    "source_link": "https://fred.stlouisfed.org/series/DGS2"
+   },
+   {
+    "item": "macro:BAMLH0A0HYM2",
+    "message": "FRED_API_KEY未設定（GitHub Secretsに登録してください）",
+    "source_link": "https://fred.stlouisfed.org/series/BAMLH0A0HYM2"
+   },
+   {
+    "item": "macro:FEDFUNDS",
+    "message": "FRED_API_KEY未設定（GitHub Secretsに登録してください）",
+    "source_link": ""
+   },
+   {
+    "item": "macro:CPIAUCSL",
+    "message": "FRED_API_KEY未設定（GitHub Secretsに登録してください）",
+    "source_link": ""
+   },
+   {
+    "item": "macro:UNRATE",
+    "message": "FRED_API_KEY未設定（GitHub Secretsに登録してください）",
+    "source_link": ""
+   },
+   {
     "item": "sentiment:fear_greed",
-    "message": "バッチ未実行のため未取得（サンプル）",
+    "message": "HTTPError: HTTP Error 418: Unknown Error（非公式APIのため失敗時は手動入力可）",
     "source_link": "https://edition.cnn.com/markets/fear-and-greed"
    },
    {
     "item": "sentiment:put_call",
-    "message": "バッチ未実行のため未取得（サンプル）",
+    "message": "CBOE CSV取得失敗（形式変更の可能性。MacroMicroで確認し手動入力可）",
     "source_link": "https://en.macromicro.me/series/1651/us-put-call-ratio-index"
+   },
+   {
+    "item": "fundamental:sp500_per",
+    "message": "FMP_API_KEY未設定（手動入力またはSecrets登録）",
+    "source_link": "https://www.phoenixconnect.jp/shiller_per"
    }
   ],
   "warnings": [
    {
     "item": "fundamental:shiller_per",
-    "message": "シラーPERは手動入力運用",
+    "message": "シラーPERは安定APIなし。リンク先で確認し手動入力してください。",
     "source_link": "https://www.phoenixconnect.jp/shiller_per"
    }
   ]
