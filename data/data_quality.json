@@ -1,76 +1,146 @@
 {
- "updated_at": "2026-07-05T21:07:39+00:00",
- "run_id": "seed-local",
+ "updated_at": "2026-07-06T13:46:00+00:00",
+ "run_id": "03c331fb124b",
  "items": [
+  {
+   "item": "prices:^GSPC",
+   "status": "ok",
+   "message": "752行取得",
+   "source_link": "",
+   "occurred_at": "2026-07-06T13:45:58+00:00"
+  },
   {
    "item": "prices:SPY",
    "status": "ok",
-   "message": "CSV seed 8417行",
+   "message": "752行取得",
    "source_link": "",
-   "occurred_at": "2026-07-05T21:07:38+00:00"
+   "occurred_at": "2026-07-06T13:45:58+00:00"
   },
   {
    "item": "prices:QQQ",
    "status": "ok",
-   "message": "CSV seed 6872行",
+   "message": "752行取得",
    "source_link": "",
-   "occurred_at": "2026-07-05T21:07:38+00:00"
+   "occurred_at": "2026-07-06T13:45:59+00:00"
   },
   {
    "item": "prices:IWM",
    "status": "ok",
-   "message": "CSV seed 6593行",
+   "message": "752行取得",
    "source_link": "",
-   "occurred_at": "2026-07-05T21:07:38+00:00"
+   "occurred_at": "2026-07-06T13:45:59+00:00"
   },
   {
    "item": "prices:SOXL",
    "status": "ok",
-   "message": "CSV seed 4131行",
+   "message": "752行取得",
    "source_link": "",
-   "occurred_at": "2026-07-05T21:07:39+00:00"
+   "occurred_at": "2026-07-06T13:45:59+00:00"
+  },
+  {
+   "item": "prices:^N225",
+   "status": "ok",
+   "message": "732行取得",
+   "source_link": "",
+   "occurred_at": "2026-07-06T13:45:59+00:00"
   },
   {
    "item": "prices:1306.T",
    "status": "ok",
-   "message": "CSV seed 6115行",
+   "message": "732行取得",
    "source_link": "",
-   "occurred_at": "2026-07-05T21:07:39+00:00"
+   "occurred_at": "2026-07-06T13:45:59+00:00"
   },
   {
-   "item": "prices:^GSPC",
+   "item": "prices:^VIX",
    "status": "ok",
-   "message": "CSV seed",
+   "message": "753行取得",
    "source_link": "",
-   "occurred_at": "2026-07-05T21:07:39+00:00"
+   "occurred_at": "2026-07-06T13:46:00+00:00"
+  },
+  {
+   "item": "macro:DGS10",
+   "status": "failed",
+   "message": "FRED_API_KEY未設定（GitHub Secretsに登録してください）",
+   "source_link": "https://fred.stlouisfed.org/series/DGS10",
+   "occurred_at": "2026-07-06T13:46:00+00:00"
+  },
+  {
+   "item": "macro:DGS2",
+   "status": "failed",
+   "message": "FRED_API_KEY未設定（GitHub Secretsに登録してください）",
+   "source_link": "https://fred.stlouisfed.org/series/DGS2",
+   "occurred_at": "2026-07-06T13:46:00+00:00"
+  },
+  {
+   "item": "macro:BAMLH0A0HYM2",
+   "status": "failed",
+   "message": "FRED_API_KEY未設定（GitHub Secretsに登録してください）",
+   "source_link": "https://fred.stlouisfed.org/series/BAMLH0A0HYM2",
+   "occurred_at": "2026-07-06T13:46:00+00:00"
+  },
+  {
+   "item": "macro:FEDFUNDS",
+   "status": "failed",
+   "message": "FRED_API_KEY未設定（GitHub Secretsに登録してください）",
+   "source_link": "",
+   "occurred_at": "2026-07-06T13:46:00+00:00"
+  },
+  {
+   "item": "macro:CPIAUCSL",
+   "status": "failed",
+   "message": "FRED_API_KEY未設定（GitHub Secretsに登録してください）",
+   "source_link": "",
+   "occurred_at": "2026-07-06T13:46:00+00:00"
+  },
+  {
+   "item": "macro:UNRATE",
+   "status": "failed",
+   "message": "FRED_API_KEY未設定（GitHub Secretsに登録してください）",
+   "source_link": "",
+   "occurred_at": "2026-07-06T13:46:00+00:00"
   },
   {
    "item": "sentiment:vix",
    "status": "ok",
-   "message": "CSV seed",
+   "message": "VIX=16.49 (2026-07-06)",
    "source_link": "",
-   "occurred_at": "2026-07-05T21:07:39+00:00"
+   "occurred_at": "2026-07-06T13:46:00+00:00"
   },
   {
    "item": "sentiment:fear_greed",
    "status": "failed",
-   "message": "バッチ未実行のため未取得（サンプル）",
+   "message": "HTTPError: HTTP Error 418: Unknown Error（非公式APIのため失敗時は手動入力可）",
    "source_link": "https://edition.cnn.com/markets/fear-and-greed",
-   "occurred_at": "2026-07-05T21:07:39+00:00"
+   "occurred_at": "2026-07-06T13:46:00+00:00"
   },
   {
    "item": "sentiment:put_call",
    "status": "failed",
-   "message": "バッチ未実行のため未取得（サンプル）",
+   "message": "CBOE CSV取得失敗（形式変更の可能性。MacroMicroで確認し手動入力可）",
    "source_link": "https://en.macromicro.me/series/1651/us-put-call-ratio-index",
-   "occurred_at": "2026-07-05T21:07:39+00:00"
+   "occurred_at": "2026-07-06T13:46:00+00:00"
+  },
+  {
+   "item": "fundamental:sp500_per",
+   "status": "failed",
+   "message": "FMP_API_KEY未設定（手動入力またはSecrets登録）",
+   "source_link": "https://www.phoenixconnect.jp/shiller_per",
+   "occurred_at": "2026-07-06T13:46:00+00:00"
   },
   {
    "item": "fundamental:shiller_per",
    "status": "manual",
-   "message": "シラーPERは手動入力運用",
+   "message": "シラーPERは安定APIなし。リンク先で確認し手動入力してください。",
    "source_link": "https://www.phoenixconnect.jp/shiller_per",
-   "occurred_at": "2026-07-05T21:07:39+00:00"
+   "occurred_at": "2026-07-06T13:46:00+00:00"
+  },
+  {
+   "item": "scores:placeholder",
+   "status": "ok",
+   "message": "スコアはHTMLアプリ側で計算（設計方針）",
+   "source_link": "",
+   "occurred_at": "2026-07-06T13:46:00+00:00"
   }
  ]
 }
