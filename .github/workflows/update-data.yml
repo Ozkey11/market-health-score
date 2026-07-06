@@ -33,12 +33,20 @@ jobs:
           FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
           ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
         run: python batch/main.py
-        working-directory: .
+         working-directory: .
 
       - name: Commit updated data
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git pull --rebase origin main
+
           git add data/*.json database/market_data.sqlite || true
-          git commit -m "Update market data [skip ci]" || echo "No changes"
-          git push
+
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Update market data [skip ci]"
+            git push origin main
+          fi
