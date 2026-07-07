@@ -1,20 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-fetch_fundamentals.py v3 — ファンダメンタル指標の自動取得バッチ
-GitHub Actionsで毎日実行 → data/fundamentals.json
+fetch_fundamentals.py v4 — ファンダメンタル指標の自動取得バッチ
+修正: multplのregex(1.5誤マッチ修正)、NAPM廃止対応、ISM手入力フォールバック
 
 取得先:
   FRED API  : HYスプレッド(BAMLH0A0HYM2), イールドカーブ(T10Y2Y)
-  multpl.com: シラーPER, S&P500 PER(TTM) — トップページから最新値を取得
+  multpl.com: シラーPER(41.60等), S&P500 PER(TTM)(32.15等) — "Current ... Ratio: XX.XX"
   Yahoo Fin : MOVE(^MOVE), WTI(CL=F), 銅(HG=F), DXY(DX-Y.NYB) — yfinanceで252日Z
-  ISM       : FRED廃止済みのため、investing.com経済カレンダーからスクレイピング
-              失敗時は前回値を保持(手入力で上書き可)
+  ISM       : FREDから廃止済。前回値保持+手入力で更新
 """
 import os, json, sys, time, re
 from datetime import datetime, timezone
 from urllib.request import urlopen, Request
-from urllib.error import HTTPError
 
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "fundamentals.json")
 FRED_KEY = os.environ.get("FRED_API_KEY", "")
@@ -27,7 +25,6 @@ def _get(url, headers=None):
     with urlopen(req, timeout=25) as r:
         return r.read().decode("utf-8")
 
-# ── 前回データの読み込み (差分更新用) ──
 def load_prev():
     try:
         with open(OUT, encoding="utf-8") as f:
@@ -51,46 +48,28 @@ def fred_latest(series_id):
         print(f"  ✖ FRED {series_id}: {e}")
     return None
 
-# ── multpl.com: トップページ or テーブルページから最新値 ──
-def multpl(path, name):
-    """複数のパターンで試行"""
-    for url in [f"https://www.multpl.com/{path}", f"https://www.multpl.com/{path}/table/by-month"]:
-        try:
-            html = _get(url, {"Referer": "https://www.multpl.com/"})
-            # パターン1: "Current ... is XX.XX"
-            m = re.search(r'(?:Current|current)[^0-9]*?([\d]{1,3}\.[\d]{1,2})', html)
-            if m:
-                return {"value": float(m.group(1)), "source": f"multpl.com/{path}"}
-            # パターン2: テーブルの最初の数値セル
-            m = re.search(r'<td[^>]*>\s*([\d]{1,3}\.\d{1,2})\s*</td>', html)
-            if m:
-                return {"value": float(m.group(1)), "source": f"multpl.com/{path}"}
-            # パターン3: idやclass付きの要素
-            m = re.search(r'id="current"[^>]*>([\d.]+)', html)
-            if m:
-                return {"value": float(m.group(1)), "source": f"multpl.com/{path}"}
-        except Exception as e:
-            print(f"  ✖ multpl {path} ({url}): {e}")
-            continue
-    return None
-
-# ── ISM: investing.comの経済カレンダーページからスクレイピング ──
-def fetch_ism():
-    """ISMはFREDから廃止。investing.comのPMIデータを試行し、失敗なら前回値保持"""
-    urls = [
-        "https://www.investing.com/economic-calendar/ism-manufacturing-pmi-173",
-    ]
-    for url in urls:
-        try:
-            html = _get(url, {"Referer": "https://www.investing.com/"})
-            # "Actual" 列の最新値を探す
-            m = re.search(r'(?:Actual|actual|結果)[^0-9]*?([\d]{2}\.[\d])', html)
-            if m:
-                val = float(m.group(1))
-                if 30 < val < 70:  # ISMの妥当範囲
-                    return {"value": val, "source": "investing.com ISM PMI"}
-        except Exception as e:
-            print(f"  ✖ ISM ({url}): {e}")
+# ── multpl.com ──
+def multpl(path):
+    """'Current ... Ratio: 41.60' or 'Current ... is 41.60' パターンで取得"""
+    url = f"https://www.multpl.com/{path}"
+    try:
+        html = _get(url, {"Referer": "https://www.multpl.com/"})
+        # パターン1: "Current Shiller PE Ratio: 41.60" or "Current S&P 500 PE Ratio is 32.15"
+        # 2桁以上の整数部を要求して、CSSのstroke-width等(1.5)を除外
+        m = re.search(r'Current[^:]*?(?::|is)\s*([\d]{2,3}\.[\d]{1,2})', html)
+        if m:
+            val = float(m.group(1))
+            print(f"    パターン1マッチ: {val}")
+            return {"value": val, "source": f"multpl.com/{path}"}
+        # パターン2: <td> 内の2桁以上の数値
+        nums = re.findall(r'<td[^>]*>\s*([\d]{2,3}\.\d{1,2})\s*</td>', html)
+        if nums:
+            val = float(nums[0])
+            print(f"    パターン2マッチ: {val}")
+            return {"value": val, "source": f"multpl.com/{path}"}
+        print(f"    ⚠ パターン不一致。HTML先頭500字: {html[:500]}")
+    except Exception as e:
+        print(f"  ✖ multpl {path}: {e}")
     return None
 
 # ── Yahoo Finance (yfinance) ──
@@ -112,11 +91,11 @@ def yahoo_z(symbol):
 
 def main():
     now = datetime.now(timezone.utc)
-    print(f"[{now.isoformat()}] ファンダメンタル指標取得バッチ v3")
+    print(f"[{now.isoformat()}] ファンダメンタル指標取得バッチ v4")
     prev = load_prev()
     ind = {}
 
-    # FRED: HYスプレッド, イールドカーブ
+    # FRED
     for key, sid in [("hy_spread", "BAMLH0A0HYM2"), ("yield_curve", "T10Y2Y")]:
         print(f"  FRED {sid}...")
         r = fred_latest(sid)
@@ -124,42 +103,26 @@ def main():
             ind[key] = r; print(f"    → {r['value']} ({r.get('date','')})")
         elif key in prev:
             ind[key] = prev[key]; ind[key]["stale"] = True
-            print(f"    → 前回値を保持: {prev[key]['value']}")
+            print(f"    → 前回値保持: {prev[key]['value']}")
         time.sleep(0.3)
 
-    # multpl.com: シラーPER, PER(TTM)
-    for key, path, name in [("shiller_pe", "shiller-pe", "シラーPER"),
-                             ("pe_ttm", "s-p-500-pe-ratio", "PER(TTM)")]:
+    # multpl.com
+    for key, path in [("shiller_pe", "shiller-pe"), ("pe_ttm", "s-p-500-pe-ratio")]:
         print(f"  multpl {path}...")
-        r = multpl(path, name)
+        r = multpl(path)
         if r:
             ind[key] = r; print(f"    → {r['value']}")
         elif key in prev:
             ind[key] = prev[key]; ind[key]["stale"] = True
-            print(f"    → 前回値を保持: {prev[key]['value']}")
+            print(f"    → 前回値保持: {prev[key]['value']}")
         time.sleep(1.5)
 
-    # ISM (FRED廃止のため代替ソース)
-    print("  ISM (investing.com)...")
-    r = fetch_ism()
-    if r:
-        # 前回値をism_prevに退避
-        if "ism" in prev and prev["ism"]["value"] != r["value"]:
-            ind["ism_prev"] = {"value": prev["ism"]["value"],
-                               "date": prev["ism"].get("date", ""),
-                               "source": "前回ISM値"}
-        elif "ism_prev" in prev:
-            ind["ism_prev"] = prev["ism_prev"]
-        ind["ism"] = r
-        print(f"    → {r['value']}")
-    else:
-        # 前回値保持
-        for k in ["ism", "ism_prev"]:
-            if k in prev:
-                ind[k] = prev[k]; ind[k]["stale"] = True
-                print(f"    → {k} 前回値を保持: {prev[k]['value']}")
-        print("    ⚠ ISM取得失敗。手入力で更新してください。")
-    time.sleep(0.5)
+    # ISM: FREDから廃止済み。前回値を保持し、手入力で更新する設計
+    print("  ISM: FREDから廃止済み → 前回値保持 or 手入力")
+    for k in ["ism", "ism_prev"]:
+        if k in prev:
+            ind[k] = prev[k]; ind[k]["stale"] = True
+            print(f"    {k}: {prev[k]['value']} (前回値保持)")
 
     # Yahoo (yfinance)
     for key, sym in [("move", "^MOVE"), ("wti", "CL=F"),
@@ -170,7 +133,7 @@ def main():
             ind[key] = r; print(f"    → {r['value']} (Z={r['z']})")
         elif key in prev:
             ind[key] = prev[key]; ind[key]["stale"] = True
-            print(f"    → 前回値を保持")
+            print(f"    → 前回値保持")
         time.sleep(0.3)
 
     result = {"updated_at": now.isoformat(), "indicators": ind}
@@ -181,8 +144,6 @@ def main():
     fresh = sum(1 for v in ind.values() if not v.get("stale"))
     total = len(ind)
     print(f"\n完了: {fresh}/{total}指標を新規取得 ({total-fresh}件は前回値保持)")
-    if fresh < 4:
-        print("⚠ 新規取得数が少ない。APIキー/ネットワークを確認。", file=sys.stderr)
     return 0
 
 if __name__ == "__main__":
