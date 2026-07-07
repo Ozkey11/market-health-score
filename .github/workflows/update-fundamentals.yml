@@ -1,0 +1,45 @@
+name: Update Fundamentals
+on:
+  schedule:
+    - cron: "30 22 * * 1-5"   # 平日 JST 07:30 (米国市場閉場後)
+  workflow_dispatch:            # 手動実行
+concurrency:
+  group: update-fundamentals
+  cancel-in-progress: false
+permissions:
+  contents: write
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install yfinance
+
+      - name: Fetch fundamentals
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: python batch/fetch_fundamentals.py
+
+      - name: Commit updated data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/fundamentals.json || true
+          git stash
+          git pull --rebase origin main
+          git stash pop || true
+          git add data/fundamentals.json || true
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Update fundamentals.json [skip ci]"
+            git push origin main
+          fi
