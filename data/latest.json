@@ -1,12 +1,12 @@
 {
- "version": "2026-07-06-1346",
+ "version": "2026-07-07-1129",
  "model_version": "mhs-core-1.0",
- "updated_at": "2026-07-06T13:46:00+00:00",
+ "updated_at": "2026-07-07T11:29:57+00:00",
  "data_date": "2026-07-06",
  "symbol": "^GSPC",
  "price_latest": {
-  "close": 7516.7099609375,
-  "change_pct": 0.45
+  "close": 7537.43017578125,
+  "change_pct": 0.72
  },
  "fundamental_latest": {
   "per_ttm": null,
@@ -14,20 +14,20 @@
   "per_is_manual": false
  },
  "macro_latest": {
-  "us10y": null,
-  "us2y": null,
-  "yield_curve_10y2y": null,
-  "hy_spread": null
+  "us10y": 4.49,
+  "us2y": 4.14,
+  "yield_curve_10y2y": 0.35,
+  "hy_spread": 2.74
  },
  "sentiment_latest": {
   "vix": {
-   "value": 16.489999771118164,
-   "date": "2026-07-06",
+   "value": 15.970000267028809,
+   "date": "2026-07-07",
    "is_manual": false
   },
   "nk_vi": {
-   "value": 37.36000061035156,
-   "date": "2026-07-06",
+   "value": 29.700000762939453,
+   "date": "2026-07-07",
    "is_manual": false
   },
   "put_call": null,
@@ -36,36 +36,6 @@
  "data_quality": {
   "status": "partial",
   "missing_items": [
-   {
-    "item": "macro:DGS10",
-    "message": "FRED_API_KEY未設定（GitHub Secretsに登録してください）",
-    "source_link": "https://fred.stlouisfed.org/series/DGS10"
-   },
-   {
-    "item": "macro:DGS2",
-    "message": "FRED_API_KEY未設定（GitHub Secretsに登録してください）",
-    "source_link": "https://fred.stlouisfed.org/series/DGS2"
-   },
-   {
-    "item": "macro:BAMLH0A0HYM2",
-    "message": "FRED_API_KEY未設定（GitHub Secretsに登録してください）",
-    "source_link": "https://fred.stlouisfed.org/series/BAMLH0A0HYM2"
-   },
-   {
-    "item": "macro:FEDFUNDS",
-    "message": "FRED_API_KEY未設定（GitHub Secretsに登録してください）",
-    "source_link": ""
-   },
-   {
-    "item": "macro:CPIAUCSL",
-    "message": "FRED_API_KEY未設定（GitHub Secretsに登録してください）",
-    "source_link": ""
-   },
-   {
-    "item": "macro:UNRATE",
-    "message": "FRED_API_KEY未設定（GitHub Secretsに登録してください）",
-    "source_link": ""
-   },
    {
     "item": "sentiment:fear_greed",
     "message": "HTTPError: HTTP Error 418: Unknown Error（非公式APIのため失敗時は手動入力可）",

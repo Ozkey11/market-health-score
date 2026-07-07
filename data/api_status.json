@@ -1,16 +1,16 @@
 {
- "updated_at": "2026-07-06T13:46:00+00:00",
- "run_id": "03c331fb124b",
- "started_at": "2026-07-06T13:45:56+00:00",
- "finished_at": "2026-07-06T13:46:00+00:00",
+ "updated_at": "2026-07-07T11:29:57+00:00",
+ "run_id": "571b1cdfc77a",
+ "started_at": "2026-07-07T11:29:52+00:00",
+ "finished_at": "2026-07-07T11:29:57+00:00",
  "counters": {
   "prices": {
    "ok": 8,
    "failed": 0
   },
   "macro": {
-   "ok": 0,
-   "failed": 6
+   "ok": 6,
+   "failed": 0
   },
   "sentiment": {
    "ok": 2,
