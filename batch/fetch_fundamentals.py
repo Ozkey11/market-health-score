@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-fetch_fundamentals.py v4 — ファンダメンタル指標の自動取得バッチ
-修正: multplのregex(1.5誤マッチ修正)、NAPM廃止対応、ISM手入力フォールバック
+fetch_fundamentals.py v5 — ファンダメンタル指標の自動取得
+main.pyから run_fetch() が呼ばれる。単体実行も可。
 
 取得先:
   FRED API  : HYスプレッド(BAMLH0A0HYM2), イールドカーブ(T10Y2Y)
-  multpl.com: シラーPER(41.60等), S&P500 PER(TTM)(32.15等) — "Current ... Ratio: XX.XX"
-  Yahoo Fin : MOVE(^MOVE), WTI(CL=F), 銅(HG=F), DXY(DX-Y.NYB) — yfinanceで252日Z
-  ISM       : FREDから廃止済。前回値保持+手入力で更新
+  multpl.com: シラーPER, S&P500 PER(TTM)
+  Yahoo/yfinance: MOVE(^MOVE), WTI(CL=F), 銅(HG=F), DXY(DX-Y.NYB) の252日Zスコア
+  ISM       : FREDから廃止済み → 前回値保持+手入力で更新
 """
 import os, json, sys, time, re
 from datetime import datetime, timezone
@@ -25,14 +25,13 @@ def _get(url, headers=None):
     with urlopen(req, timeout=25) as r:
         return r.read().decode("utf-8")
 
-def load_prev():
+def _load_prev():
     try:
         with open(OUT, encoding="utf-8") as f:
             return json.load(f).get("indicators", {})
     except: return {}
 
-# ── FRED ──
-def fred_latest(series_id):
+def _fred(series_id):
     if not FRED_KEY:
         print(f"  ⚠ FRED_API_KEY未設定 → {series_id}スキップ"); return None
     url = (f"https://api.stlouisfed.org/fred/series/observations"
@@ -48,32 +47,23 @@ def fred_latest(series_id):
         print(f"  ✖ FRED {series_id}: {e}")
     return None
 
-# ── multpl.com ──
-def multpl(path):
-    """'Current ... Ratio: 41.60' or 'Current ... is 41.60' パターンで取得"""
+def _multpl(path):
     url = f"https://www.multpl.com/{path}"
     try:
         html = _get(url, {"Referer": "https://www.multpl.com/"})
-        # パターン1: "Current Shiller PE Ratio: 41.60" or "Current S&P 500 PE Ratio is 32.15"
-        # 2桁以上の整数部を要求して、CSSのstroke-width等(1.5)を除外
+        # "Current ... Ratio: 41.60" — 整数部2桁以上を要求(CSS値1.5を除外)
         m = re.search(r'Current[^:]*?(?::|is)\s*([\d]{2,3}\.[\d]{1,2})', html)
         if m:
-            val = float(m.group(1))
-            print(f"    パターン1マッチ: {val}")
-            return {"value": val, "source": f"multpl.com/{path}"}
-        # パターン2: <td> 内の2桁以上の数値
-        nums = re.findall(r'<td[^>]*>\s*([\d]{2,3}\.\d{1,2})\s*</td>', html)
-        if nums:
-            val = float(nums[0])
-            print(f"    パターン2マッチ: {val}")
-            return {"value": val, "source": f"multpl.com/{path}"}
-        print(f"    ⚠ パターン不一致。HTML先頭500字: {html[:500]}")
+            return {"value": float(m.group(1)), "source": f"multpl.com/{path}"}
+        # テーブル内の2桁以上数値
+        m = re.search(r'<td[^>]*>\s*([\d]{2,3}\.\d{1,2})\s*</td>', html)
+        if m:
+            return {"value": float(m.group(1)), "source": f"multpl.com/{path}"}
     except Exception as e:
         print(f"  ✖ multpl {path}: {e}")
     return None
 
-# ── Yahoo Finance (yfinance) ──
-def yahoo_z(symbol):
+def _yahoo_z(symbol):
     try:
         import yfinance as yf
         tk = yf.Ticker(symbol)
@@ -89,16 +79,17 @@ def yahoo_z(symbol):
         print(f"  ✖ Yahoo {symbol}: {e}")
     return None
 
-def main():
+def run_fetch():
+    """メインの取得処理。main.pyから呼ばれる。"""
     now = datetime.now(timezone.utc)
-    print(f"[{now.isoformat()}] ファンダメンタル指標取得バッチ v4")
-    prev = load_prev()
+    print(f"[{now.isoformat()}] ファンダメンタル指標取得 v5")
+    prev = _load_prev()
     ind = {}
 
     # FRED
     for key, sid in [("hy_spread", "BAMLH0A0HYM2"), ("yield_curve", "T10Y2Y")]:
         print(f"  FRED {sid}...")
-        r = fred_latest(sid)
+        r = _fred(sid)
         if r:
             ind[key] = r; print(f"    → {r['value']} ({r.get('date','')})")
         elif key in prev:
@@ -109,7 +100,7 @@ def main():
     # multpl.com
     for key, path in [("shiller_pe", "shiller-pe"), ("pe_ttm", "s-p-500-pe-ratio")]:
         print(f"  multpl {path}...")
-        r = multpl(path)
+        r = _multpl(path)
         if r:
             ind[key] = r; print(f"    → {r['value']}")
         elif key in prev:
@@ -117,18 +108,18 @@ def main():
             print(f"    → 前回値保持: {prev[key]['value']}")
         time.sleep(1.5)
 
-    # ISM: FREDから廃止済み。前回値を保持し、手入力で更新する設計
-    print("  ISM: FREDから廃止済み → 前回値保持 or 手入力")
+    # ISM: FRED廃止済み → 前回値保持
+    print("  ISM: FRED廃止済み → 前回値保持 or 手入力")
     for k in ["ism", "ism_prev"]:
         if k in prev:
             ind[k] = prev[k]; ind[k]["stale"] = True
-            print(f"    {k}: {prev[k]['value']} (前回値保持)")
+            print(f"    {k}: {prev[k]['value']} (保持)")
 
     # Yahoo (yfinance)
     for key, sym in [("move", "^MOVE"), ("wti", "CL=F"),
                       ("copper", "HG=F"), ("dxy", "DX-Y.NYB")]:
         print(f"  Yahoo {sym}...")
-        r = yahoo_z(sym)
+        r = _yahoo_z(sym)
         if r:
             ind[key] = r; print(f"    → {r['value']} (Z={r['z']})")
         elif key in prev:
@@ -144,7 +135,7 @@ def main():
     fresh = sum(1 for v in ind.values() if not v.get("stale"))
     total = len(ind)
     print(f"\n完了: {fresh}/{total}指標を新規取得 ({total-fresh}件は前回値保持)")
-    return 0
 
+# 単体実行用
 if __name__ == "__main__":
-    sys.exit(main())
+    run_fetch()
