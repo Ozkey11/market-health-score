@@ -1,9 +1,9 @@
 {
-  "updated_at": "2026-07-08T07:42:27.746684+00:00",
+  "updated_at": "2026-07-08T15:15:09.829127+00:00",
   "indicators": {
     "hy_spread": {
-      "value": 2.72,
-      "date": "2026-07-06",
+      "value": 2.67,
+      "date": "2026-07-07",
       "source": "FRED BAMLH0A0HYM2"
     },
     "yield_curve": {
@@ -25,18 +25,18 @@
       "source": "Yahoo ^MOVE"
     },
     "wti": {
-      "value": 72.03,
-      "z": -0.013,
+      "value": 75.59,
+      "z": 0.213,
       "source": "Yahoo CL=F"
     },
     "copper": {
-      "value": 6.1735,
-      "z": 1.11,
+      "value": 6.0835,
+      "z": 0.963,
       "source": "Yahoo HG=F"
     },
     "dxy": {
-      "value": 100.963,
-      "z": 2.161,
+      "value": 101.132,
+      "z": 2.321,
       "source": "Yahoo DX-Y.NYB"
     }
   }
