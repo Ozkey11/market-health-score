@@ -1,9 +1,5 @@
 {
-<<<<<<< Updated upstream
-  "updated_at": "2026-07-07T14:08:13.933188+00:00",
-=======
-  "updated_at": "2026-07-07T14:38:59.201003+00:00",
->>>>>>> Stashed changes
+  "updated_at": "2026-07-08T07:42:27.746684+00:00",
   "indicators": {
     "hy_spread": {
       "value": 2.72,
@@ -11,16 +7,16 @@
       "source": "FRED BAMLH0A0HYM2"
     },
     "yield_curve": {
-      "value": 0.35,
-      "date": "2026-07-06",
+      "value": 0.36,
+      "date": "2026-07-07",
       "source": "FRED T10Y2Y"
     },
     "shiller_pe": {
-      "value": 1.5,
+      "value": 41.77,
       "source": "multpl.com/shiller-pe"
     },
     "pe_ttm": {
-      "value": 1.5,
+      "value": 32.28,
       "source": "multpl.com/s-p-500-pe-ratio"
     },
     "move": {
@@ -29,33 +25,18 @@
       "source": "Yahoo ^MOVE"
     },
     "wti": {
-<<<<<<< Updated upstream
-      "value": 69.98,
-      "z": -0.143,
+      "value": 72.03,
+      "z": -0.013,
       "source": "Yahoo CL=F"
     },
     "copper": {
-      "value": 6.244,
-      "z": 1.233,
+      "value": 6.1735,
+      "z": 1.11,
       "source": "Yahoo HG=F"
     },
     "dxy": {
-      "value": 100.906,
-      "z": 2.138,
-=======
-      "value": 70.24,
-      "z": -0.126,
-      "source": "Yahoo CL=F"
-    },
-    "copper": {
-      "value": 6.241,
-      "z": 1.228,
-      "source": "Yahoo HG=F"
-    },
-    "dxy": {
-      "value": 100.972,
-      "z": 2.201,
->>>>>>> Stashed changes
+      "value": 100.963,
+      "z": 2.161,
       "source": "Yahoo DX-Y.NYB"
     }
   }
