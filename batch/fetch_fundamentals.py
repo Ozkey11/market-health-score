@@ -79,6 +79,32 @@ def _yahoo_z(symbol):
         print(f"  ✖ Yahoo {symbol}: {e}")
     return None
 
+
+def _fetch_pcr():
+    """Put/Call Ratio: yfinanceで^CPCEを取得(CBOE直接は403で封鎖済み)"""
+    try:
+        import yfinance as yf
+        tk = yf.Ticker("^CPCE")
+        df = tk.history(period="5d")
+        if df.empty: 
+            # フォールバック: Barchart等のスクレイピング
+            try:
+                html = _get("https://www.barchart.com/options/put-call-ratio",
+                            {"Referer": "https://www.barchart.com/"})
+                import re
+                m = re.search(r'Equity[^0-9]*?(0\.\d{2,3})', html)
+                if m:
+                    return {"value": float(m.group(1)), "source": "barchart.com"}
+            except: pass
+            return None
+        last = float(df["Close"].dropna().iloc[-1])
+        if 0.1 < last < 5:
+            return {"value": round(last, 3), "source": "Yahoo ^CPCE"}
+        return None
+    except Exception as e:
+        print(f"  ✖ PCR: {e}")
+    return None
+
 def run_fetch():
     """メインの取得処理。main.pyから呼ばれる。"""
     now = datetime.now(timezone.utc)
@@ -126,6 +152,15 @@ def run_fetch():
             ind[key] = prev[key]; ind[key]["stale"] = True
             print(f"    → 前回値保持")
         time.sleep(0.3)
+
+    # Put/Call Ratio
+    print("  PCR (Yahoo ^CPCE)...")
+    r = _fetch_pcr()
+    if r:
+        ind["pcr"] = r; print(f"    → {r['value']}")
+    elif "pcr" in prev:
+        ind["pcr"] = prev["pcr"]; ind["pcr"]["stale"] = True
+        print(f"    → 前回値保持: {prev['pcr']['value']}")
 
     result = {"updated_at": now.isoformat(), "indicators": ind}
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
