@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>S&P 500 天井・大底 スコア判定</title>
+<title>株価スコア v3.4 — キャッシュ+取得分離+お気に入り</title>
 <style>
 :root{
   --bg:#07090f;--bg2:#0c1020;--bg3:#111828;
@@ -13,10 +13,22 @@
   --acc:#534AB7;
   --r:10px;--rl:16px;
   --mono:'Courier New',monospace;
+  --shadow:0 4px 32px rgba(0,0,0,0.22);
+  --body-bg:#e8edf2;
+}
+/* ── ライトテーマ ── */
+:root.light{
+  --bg:#ffffff;--bg2:#f5f6fa;--bg3:#eaecf2;
+  --t1:#1a1a2e;--t2:#555570;--t3:#8888a0;
+  --bd:#d0d4e0;--bd2:#c0c5d5;
+  --grn:#0f7d58;--red:#c0411a;--ylw:#9a6510;
+  --acc:#4a42a0;
+  --shadow:0 2px 16px rgba(0,0,0,0.08);
+  --body-bg:#f0f2f5;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{background:#e8edf2;color:var(--t1);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh}
-.wrap{max-width:800px;margin:0 auto;padding:28px 24px 60px;background:var(--bg);box-shadow:0 4px 32px rgba(0,0,0,0.22);}
+body{background:var(--body-bg);color:var(--t1);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh}
+.wrap{max-width:800px;margin:0 auto;padding:28px 24px 60px;background:var(--bg);box-shadow:var(--shadow);}
 h1{font-size:21px;font-weight:500}
 .panel{background:var(--bg2);border:.5px solid var(--bd2);border-radius:var(--rl);padding:18px;margin-bottom:18px}
 .tabs{display:flex;gap:4px;margin-bottom:14px;flex-wrap:wrap}
@@ -77,9 +89,20 @@ button:disabled{opacity:.4;cursor:default}
 .conf-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
 .conf-num{font-size:32px;font-weight:700;font-family:'Courier New',monospace}
 
+.fund-in{width:100%;margin-top:3px;background:var(--bg3);border:.5px solid var(--bd2);border-radius:6px;
+  color:var(--t1);padding:5px 7px;font-size:13px;font-family:'Courier New',monospace}
+.fund-in:focus{outline:none;border-color:#534AB7}
+.bd-t{width:100%;border-collapse:collapse;font-size:12px}
+.bd-t th{color:var(--t2);font-weight:500;padding:4px 8px;border-bottom:.5px solid var(--bd)}
+.bd-t td{padding:5px 8px;border-bottom:.5px solid var(--bd);color:var(--t1)}
+.theme-btn{position:fixed;top:12px;right:14px;z-index:100;background:var(--bg3);color:var(--t2);
+  border:.5px solid var(--bd2);border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;
+  transition:background .2s,color .2s;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.theme-btn:hover{background:var(--bg2);color:var(--t1)}
 </style>
 </head>
 <body>
+<button class="theme-btn" id="themeToggle" title="テーマ切替" onclick="toggleTheme()">☀️ ライト</button>
 <div class="wrap">
 
 <!-- Header -->
@@ -96,7 +119,6 @@ button:disabled{opacity:.4;cursor:default}
     <button class="tab on" data-s="yahoo">Yahoo Finance (キー不要)</button>
     <button class="tab" data-s="av">Alpha Vantage</button>
     <button class="tab" data-s="fh">Finnhub</button>
-    <button class="tab" data-s="json" id="tabJson" title="GitHub Pages上のバッチ生成JSON（data/history_1y.json）を読み込みます">📦 JSON(Pages)</button>
   </div>
 
   <!-- APIキー入力欄（選択中のタブに応じて自動表示） -->
@@ -130,53 +152,25 @@ button:disabled{opacity:.4;cursor:default}
       <input type="text" id="iSym" placeholder="直接入力してEnter: AAPL / ^N225 / 7203.T ..." style="width:100%"/>
     </div>
     <div style="display:flex;gap:8px;flex-shrink:0">
-      <button class="btn-p" id="btnFetch">▶ 表示</button>
-      <button id="btnReload">↻ 再取得</button>
+      <button class="btn-p" id="btnFetch" title="キャッシュ優先で表示">▶ 表示</button>
+      <button id="btnReload" title="株価を再取得">↻ 再取得</button>
+      <button id="btnFundReload" title="ファンダ指標のみ再取得" style="font-size:12px">📊 ファンダ</button>
+      <button id="btnFav" title="お気に入り登録/解除" style="font-size:15px;padding:6px 10px;background:transparent;border:none;color:var(--t3);cursor:pointer">☆</button>
     </div>
   </div>
   <p style="font-size:10px;color:var(--t3);margin-top:6px;line-height:1.5">
     Yahoo Finance: ^GSPC, ^N225, AAPL, 7203.T など　|　Alpha Vantage: AAPL, MSFT, SPY など（指数コードは非対応・ETFで代替）
   </p>
+  <div id="favBar" style="display:none;margin-top:8px;padding-top:8px;border-top:.5px solid var(--bd)">
+    <span style="font-size:11px;color:var(--t2)">★ お気に入り</span>
+    <div id="favChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px"></div>
+  </div>
   <div id="historyWrap" style="display:none;margin-top:10px;padding-top:10px;border-top:.5px solid var(--bd)">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
       <span style="font-size:11px;color:var(--t3)">🕘 最近検索した銘柄</span>
       <button id="btnClearHist" style="font-size:10px;padding:2px 8px;color:var(--t3)">履歴をクリア</button>
     </div>
     <div id="historyChips" style="display:flex;flex-wrap:wrap;gap:5px"></div>
-  </div>
-</div>
-
-<!-- データ基盤メタ情報（GitHub Pages / JSON連携時に表示） -->
-<div id="pagesMeta" style="display:none;margin-bottom:10px;padding:8px 14px;background:var(--bg2);border:.5px solid var(--bd);border-radius:var(--r);font-size:11px;color:var(--t2);line-height:1.6"></div>
-
-<!-- データ品質・取得失敗通知バナー -->
-<div id="qualityBanner" style="display:none;margin-bottom:14px;padding:12px 16px;background:rgba(216,144,48,.10);border:.5px solid rgba(216,144,48,.45);border-radius:var(--r)">
-  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:6px">
-    <span style="font-size:13px;font-weight:600;color:#E8A94B">⚠ データ取得に一部失敗しました</span>
-    <span style="display:flex;gap:8px">
-      <button id="btnManualInput" style="font-size:11px;padding:4px 12px">✏️ 手動入力</button>
-      <button id="btnQualityClose" style="font-size:11px;padding:4px 10px;color:var(--t3)">閉じる</button>
-    </span>
-  </div>
-  <div id="qualityList" style="font-size:12px;line-height:1.8;color:var(--t1)"></div>
-</div>
-
-<!-- 手動データ入力モーダル -->
-<div id="manualModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;align-items:center;justify-content:center;padding:20px">
-  <div style="background:var(--bg2);border:.5px solid var(--bd2);border-radius:var(--rl);max-width:460px;width:100%;padding:22px;max-height:85vh;overflow-y:auto">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-      <h2 style="font-size:16px;font-weight:600">✏️ 指標の手動入力</h2>
-      <button id="btnManualClose" style="font-size:12px;padding:4px 10px">✕</button>
-    </div>
-    <p style="font-size:11px;color:var(--t2);line-height:1.6;margin-bottom:14px">
-      API取得に失敗した指標を手動で補完できます。値はこのブラウザ（localStorage）に日付付きで保存され、
-      入力から<b>3日間</b>スコア計算の代替値として使用されます。空欄の項目は使用されません。
-    </p>
-    <div id="manualFields"></div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
-      <button id="btnManualClear" style="font-size:12px;padding:7px 14px;color:var(--t3)">全クリア</button>
-      <button id="btnManualSave" class="btn-p" style="font-size:13px;padding:8px 20px">保存して再計算</button>
-    </div>
   </div>
 </div>
 
@@ -259,15 +253,62 @@ button:disabled{opacity:.4;cursor:default}
     </div>
   </div>
 
-  <!-- ═══ LAYER 5: 総合判定 ═══ -->
+  <!-- ═══ LAYER 5: ファンダメンタル環境 (v3新設) ═══ -->
   <div class="layer-head">
     <div class="layer-num">5</div>
+    <div class="layer-title">ファンダメンタル環境（Fundamental）</div>
+    <div class="layer-sub">クレジット・債券ボラ・商品Z・バリュエーション・金利構造</div>
+  </div>
+  <div class="panel">
+    <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;margin-bottom:6px">
+      <div style="flex-shrink:0;display:flex;gap:10px">
+        <div id="gaugeFundB"></div>
+        <div id="gaugeFundT"></div>
+      </div>
+      <div style="flex:1;min-width:230px" id="fundList"></div>
+    </div>
+    <div style="border-top:.5px solid var(--bd);padding-top:10px;margin-top:6px">
+      <p style="font-size:11px;color:var(--t2);margin-bottom:6px">
+        手入力指標（Yahoo未提供分・入力すると自動で再採点、ブラウザに保存されます）
+        <span style="color:var(--t3)">｜ HYスプレッド: FRED "BAMLH0A0HYM2" ／ シラーPER: multpl.com ／ 10y-2y: FRED "T10Y2Y" ／ ISM: ismworld.org</span>
+      </p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px" id="fundInputs">
+        <label style="font-size:11px;color:var(--t2)">HYスプレッド%<input type="number" step="0.01" id="fHY" class="fund-in" placeholder="例 3.20"></label>
+        <label style="font-size:11px;color:var(--t2)">シラーPER<input type="number" step="0.1" id="fShiller" class="fund-in" placeholder="例 36.5"></label>
+        <label style="font-size:11px;color:var(--t2)">PER(TTM)<input type="number" step="0.1" id="fPER" class="fund-in" placeholder="例 25.9"></label>
+        <label style="font-size:11px;color:var(--t2)">10年-2年金利差%<input type="number" step="0.01" id="fYC" class="fund-in" placeholder="例 0.45"></label>
+        <label style="font-size:11px;color:var(--t2)">ISM製造業<input type="number" step="0.1" id="fISM" class="fund-in" placeholder="例 53.3"></label>
+        <label style="font-size:11px;color:var(--t2)">ISM前回値<input type="number" step="0.1" id="fISMprev" class="fund-in" placeholder="例 54.0"></label>
+        <label style="font-size:11px;color:var(--t2)">P/Cレシオ<input type="number" step="0.01" id="fPCR" class="fund-in" placeholder="例 0.65"></label>
+      </div>
+      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <label style="font-size:10.5px;color:var(--t2);flex:1;min-width:200px">FRED APIキー (HY/YC自動取得用・任意)
+          <input type="password" id="iFredKey" class="fund-in" placeholder="32文字の英数字" style="font-size:11px">
+        </label>
+        <label style="font-size:10.5px;color:var(--t2);flex:1;min-width:200px">GitHubデータURL (自動設定 or 手動)
+          <input type="text" id="iFundUrl" class="fund-in" placeholder="https://raw.githubusercontent.com/.../data/fundamentals.json" style="font-size:10px">
+        </label>
+      </div>
+      <p id="fundUpdateInfo" style="font-size:10.5px;color:var(--t2);margin-top:4px"></p>
+      <p style="font-size:10.5px;color:var(--t3);margin-top:6px">
+        ※ ファンダはタイミングでなく<b>環境の判定</b>に使う設計（第1・第2分析: ファンダ単独のエッジは20日で減衰、暴落年は機能低下）。
+        金利・商品・DXYの生値は「年代フィルタ」となるため採点から除外し、Zスコア・変化・クレジット系のみを使用。
+      </p>
+    </div>
+  </div>
+
+  <!-- ═══ LAYER 6: 総合判定 (v3: スコア分離アーキテクチャ) ═══ -->
+  <div class="layer-head">
+    <div class="layer-num">6</div>
     <div class="layer-title">総合判定（Overall）</div>
-    <div class="layer-sub">0=大底 / 100=天井</div>
+    <div class="layer-sub">テク+需給 × ファンダ ｜ 0=大底 / 100=天井</div>
   </div>
   <div class="panel" style="text-align:center;padding:20px 12px 16px">
     <div id="gaugeSvg"></div>
     <div id="verdict" class="verdict"></div>
+    <div id="zoneNote" style="font-size:11px;color:var(--t3);margin-top:6px"></div>
+    <div id="depthPanel" style="margin:10px auto 0;max-width:560px"></div>
+    <div id="scoreBreakdown" style="margin:14px auto 0;max-width:560px;overflow-x:auto"></div>
     <div class="conf-row" style="justify-content:center;margin-top:14px">
       <div>
         <p style="font-size:11px;color:var(--t2)">Confidence（自信）</p>
@@ -323,6 +364,23 @@ button:disabled{opacity:.4;cursor:default}
 </div><!-- /wrap -->
 
 <script>
+
+/* テーマ切替(v3.2) — onclick属性で確実に動作 */
+function toggleTheme(){
+  const root=document.documentElement;
+  const isLight=root.classList.toggle('light');
+  document.getElementById('themeToggle').textContent=isLight?'🌙 ダーク':'☀️ ライト';
+  try{localStorage.setItem('sp500_theme_v3',isLight?'light':'dark');}catch(e){}
+}
+(function(){
+  let s='dark';try{s=localStorage.getItem('sp500_theme_v3')||'dark';}catch(e){}
+  if(s==='light'){
+    document.documentElement.classList.add('light');
+    document.addEventListener('DOMContentLoaded',()=>{
+      const b=document.getElementById('themeToggle');if(b)b.textContent='🌙 ダーク';
+    });
+  }
+})();
 /* ═══════════════════════════════════════════════
    CONFIG / STATE
 ═══════════════════════════════════════════════ */
@@ -350,12 +408,78 @@ const PRESETS=[
 ];
 let activePst=PRESETS[0];
 
-// ── データキャッシュ（再取得ボタン以外では再フェッチしない）──
+
+/* ═══ 株価キャッシュ (localStorage永続) ═══ */
+var PriceCache={
+  _k(s,sym){return CONFIG.priceCache.key+'|'+s+'|'+(sym.y||sym.a||'');},
+  load(s,sym){try{return JSON.parse(localStorage.getItem(this._k(s,sym)));}catch(e){return null;}},
+  save(s,sym,raw){
+    try{
+      const max=CONFIG.priceCache.maxDays;
+      const d={closes:raw.closes?.slice(-max),highs:raw.highs?.slice(-max),
+               lows:raw.lows?.slice(-max),volumes:raw.volumes?.slice(-max),
+               meta:raw.meta, at:Date.now()};
+      localStorage.setItem(this._k(s,sym),JSON.stringify(d));
+    }catch(e){console.warn('キャッシュ保存失敗:',e);}
+  },
+  info(s,sym){
+    const d=this.load(s,sym);
+    if(!d?.closes?.length) return null;
+    return{days:d.closes.length, at:d.at, stale:Date.now()-(d.at||0)>CONFIG.priceCache.maxAge};
+  },
+};
+
+/* ═══ ファンダ永続保持 ═══ */
+var FundPersist={
+  load(){try{return JSON.parse(localStorage.getItem(CONFIG.fundPersistKey)||'null');}catch(e){return null;}},
+  save(auto,manual){try{localStorage.setItem(CONFIG.fundPersistKey,JSON.stringify({auto,manual,at:Date.now()}));}catch(e){}},
+  getAuto(){return this.load()?.auto||null;},
+  getManual(){return this.load()?.manual||null;},
+  age(){const d=this.load();return d?.at?Date.now()-d.at:Infinity;},
+};
+function applyManualToDOM(obj){
+  if(!obj) return;
+  [['fHY','hy'],['fShiller','shiller'],['fPER','perTtm'],['fYC','ycurve'],['fISM','ism'],['fISMprev','ismPrev']]
+    .forEach(([id,k])=>{const el=document.getElementById(id);if(el&&obj[k]!=null&&!el.dataset.manual)el.value=obj[k];});
+}
+
+/* ═══ お気に入り管理 ═══ */
+var Favorites={
+  _l(){try{return JSON.parse(localStorage.getItem(CONFIG.favKey)||'[]');}catch(e){return[];}},
+  _s(a){try{localStorage.setItem(CONFIG.favKey,JSON.stringify(a));}catch(e){}},
+  list(){return this._l();},
+  has(c,s){return this._l().some(f=>f.c===c&&f.s===s);},
+  toggle(c,s,n){let a=this._l();const i=a.findIndex(f=>f.c===c&&f.s===s);
+    if(i>=0)a.splice(i,1);else{a.unshift({c,s,n:n||c});if(a.length>20)a.pop();}
+    this._s(a);return i<0;},
+};
+function renderFavorites(){
+  const arr=Favorites.list(), box=document.getElementById('favChips'),
+        bar=document.getElementById('favBar');
+  if(!arr.length){bar.style.display='none';return;}
+  bar.style.display='';
+  box.innerHTML=arr.map(f=>
+    `<button class="chip" data-fc="${f.c}" data-fs="${f.s}">${f.c} <span style="opacity:.5;font-size:10px">${f.s==='yahoo'?'Y':'AV'}</span></button>`
+  ).join('');
+  box.querySelectorAll('.chip').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      src=btn.dataset.fs;
+      document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.s===src));
+      document.getElementById('iSym').value=btn.dataset.fc;
+      activePst=null; run(false);
+    });
+  });
+}
+function updateFavBtn(){
+  const sym=getCurSym(),c=src==='yahoo'?sym.y:(sym.a||sym.y);
+  const b=document.getElementById('btnFav');
+  const on=Favorites.has(c,src); b.textContent=on?'★':'☆'; b.style.color=on?'#D8B830':'var(--t3)';
+}
+
+// ── データキャッシュ（メモリ, セッション中のみ）──
 const dataCache=new Map(); // key: "src|symbol" → {raw,sentiment,market,result,historical}
 function cacheKeyFor(srcVal,symObj){
-  const code=(srcVal==='yahoo'||srcVal==='json')?symObj.y
-            :srcVal==='av'?(symObj.a||symObj.y)
-            :(symObj.fh||symObj.a||symObj.y);
+  const code=srcVal==='yahoo'?symObj.y:srcVal==='av'?(symObj.a||symObj.y):(symObj.fh||symObj.a||symObj.y);
   return srcVal+'|'+code;
 }
 
@@ -369,6 +493,60 @@ const CONFIG={
     base:0.55,           // Layer2（市場行動スコア）
     confirmation:0.25,   // Layer3（反転確認）
     sentiment:0.20,      // Layer4（市場心理）
+    fundamental:0.30,    // Confidence票としてのファンダ環境の相対重み(v3)
+  },
+
+  // ── v3: スコア分離アーキテクチャ ──────────────────────────
+  // 「テクニカル+需給」と「ファンダメンタル」を別スコアとして算出し、
+  // 大底側 70:30 / 天井側 55:45 で全総合に合算する。
+  // 根拠: 第1レポート11-2（底のIC・検出率はテク+需給が支配的、
+  //        天井側はファンダが上位1000条件への登場率首位）
+  blend:{
+    bottom:{tq:0.70, fund:0.30},
+    top:   {tq:0.55, fund:0.45},
+  },
+
+  // ファンダメンタル採点の重み（合計100、利用可能な項目で自動正規化）
+  // 採用指標は第2レポート第3章の片時代率検証に基づき、
+  // レベル値（金利・商品・DXYの生値）を排除しZ・変化・クレジット系に限定
+  fundWeights:{
+    bottom:{ hy:24, move:16, copperZ:16, wtiZ:10, dxyZ:10, ismChg:12, perTtm:12 },
+    top:   { shiller:22, perTtm:14, ycurve:22, hyLow:12, moveLow:8, ismChg:14, copperZ:8 },
+  },
+
+  // 行動ゾーン（第2レポート第6章: total≦25買い→total≧70売却が勝率最良）
+  zones:{ buy:25, exit:70 },
+
+  // ── v3.1: 深度D値（青天井の二層目）─────────────────────
+  // 第4分析レポート: 0-100の行動スケールは維持し、満点を超えた極値の深さを
+  // D = Σ w·α·ln(1+超過/スパン) として別枠表示する。
+  //  - 対象は「深いほど良い」ことが実証された指標のみ（HY・MFI等の逆転型は対象外）
+  //  - D≧5: 深度あり / D≧15: A級パニック域（コロナ実測D≈23、B級危機は0〜2）
+  //  - 買いゾーン滞在中にDが直近最大を更新 → 分割買い増しのトリガ
+  // ── GitHub JSONフェッチ: バッチで取得したファンダ指標を自動読み込み ──
+  fundJsonUrl: '',  // GitHub Raw URL — 初回使用時に自動検出 or ユーザー設定
+  fundJsonKey: 'sp500_fund_json_url_v1',
+  priceCache:{ key:'sp500_pc_v1', maxDays:400, maxAge:86400000 },
+  favKey:'sp500_fav_v1',
+  fundPersistKey:'sp500_fp_v1',
+
+  depth:{
+    alpha:0.6,
+    tiers:{ some:5, panic:15 },
+    histKey:'sp500_depth_hist_v1', histN:15,
+    // full=満点しきい値, span=|満点-起点|（ランプ1個分）, w=重み, neg=下方向が深い
+    tq:{
+      vol:  { full:40,   span:20,  w:20, neg:false },  // VIX / 日経VI
+      ma50d:{ full:-12,  span:7,   w:16, neg:true  },  // 50日線乖離%
+      atr:  { full:2.0,  span:0.8, w:14, neg:false },  // ATR比
+      pz:   { full:-2.5, span:1.5, w:6,  neg:true  },  // 価格Zスコア
+    },
+    fund:{
+      move:   { full:170, span:50, w:16, neg:false },  // MOVE指数
+      copperZ:{ full:-3,  span:2,  w:16, neg:true  },  // 銅 252日Z
+      wtiZ:   { full:-3,  span:2,  w:10, neg:true  },  // WTI 252日Z
+    },
+    blend:{ tq:0.70, fund:0.30 },  // 全総合の大底側合算比と同一
   },
 
   // Layer1: 5 Featureの重み（合計は自動正規化）
@@ -386,16 +564,22 @@ const CONFIG={
   regimeAdjustment:{
     oscMaxDelta:0.10,   // オシレーター系: ±10%以内
     devMaxDelta:0.10,   // 価格乖離系: ±10%以内
+    // v3: 弱気レジーム内の非対称補正（第2レポート第1章）
+    // 6銘柄検証で先行リターンがマイナスなのは「レンジ弱気(弱気×ADX低)」のみ。
+    // トレンド弱気・高ボラ(弱気×ADX高)は下げ切り局面＝底シグナルの好機なので、
+    // 底寄り判定のConfidenceを、レンジ弱気では減点・トレンド弱気では加点する。
+    rangeBearBottomPenalty:0.10,  // 弱気×ADX<22 での底判定Confidence減点(×|scoreDelta|)
+    strongBearBottomBoost:0.08,   // 弱気×ADX≧28 での底判定Confidence加点(×|scoreDelta|)
   },
 
   // Layer2: 各指標の基本重み（合計は自動正規化）
   layer2Weights:{
-    // 2026-07-04 更新: 4銘柄×約55,000条件のバックテスト分析に基づく再配分
-    //  - 高相関ブロック(rsi/cci/stoch/pz/ma50d, 平均|r|0.74-0.95)の合計を60→51に削減
-    //  - 予測力・独立性の高い mfi / ma50d / atr / obvMom を増量
-    //  旧: rsi:16, cci:10, stoch:8, pz:14, ma50d:12, mfi:10, volZ:6, obvMom:8, atr:6, macd:10
-    rsi:14, cci:6, stoch:6, pz:10, ma50d:15,
-    mfi:14, volZ:5, obvMom:10, atr:10, macd:10,
+    // 2026-07-05 更新(v3): 6銘柄×約48万条件の統合分析(第1)+頑健性分析(第2)に基づく
+    //  - cci/stoch を採点から除外（rsiと|r|≧0.85-0.91、情報の追加なし。第1レポート11-1）
+    //  - 除外分12ptを、期間分割で生存率の高い独立情報(ma50d/mfi/obvMom/atr/macd)へ再配分
+    //  旧(v2): rsi:14, cci:6, stoch:6, pz:10, ma50d:15, mfi:14, volZ:5, obvMom:10, atr:10, macd:10
+    rsi:14, pz:10, ma50d:17,
+    mfi:16, volZ:5, obvMom:12, atr:14, macd:12,
   },
 
   // Layer3: 各確認指標の重み（合計1.0になるよう設定）
@@ -419,182 +603,6 @@ const CONFIG={
 
 let histRangeDays=5; // 1週間=5営業日 / 1ヶ月=22営業日
 
-/* ═══════════════════════════════════════════════
-   データ基盤連携（GitHub Pages / JSON・失敗通知・手動入力）
-═══════════════════════════════════════════════ */
-// 指標→取得先リンク（batch/sources.py と同期。data/sources.json があればそちらを優先）
-let SOURCE_LINKS={
-  'sentiment:vix':       {label:'米VIX指数',        links:[{name:'Yahoo Finance',url:'https://finance.yahoo.com/quote/%5EVIX/history/'}]},
-  'sentiment:nk_vi':     {label:'日経VI',           links:[{name:'Yahoo Finance',url:'https://finance.yahoo.com/quote/%5ENKVI.OS/'}]},
-  'sentiment:put_call':  {label:'米プットコールレシオ',links:[{name:'MacroMicro(日次)',url:'https://en.macromicro.me/series/1651/us-put-call-ratio-index'}]},
-  'sentiment:fear_greed':{label:'Fear & Greed',     links:[{name:'CNN',url:'https://edition.cnn.com/markets/fear-and-greed'}]},
-  'fundamental:shiller_per':{label:'シラーPER',      links:[{name:'phoenixconnect',url:'https://www.phoenixconnect.jp/shiller_per'},{name:'multpl.com',url:'https://www.multpl.com/shiller-pe'}]},
-  'prices:main':         {label:'価格データ',        links:[{name:'Yahoo Finance',url:'https://finance.yahoo.com/'},{name:'Yahoo Finance JP',url:'https://finance.yahoo.co.jp/'}]},
-};
-let _pagesLatest=null, _pagesHistory=null, _pagesQuality=null;
-
-// GitHub Pages上のバッチ生成JSONを読み込む（file://直開きや未配置時は静かにスキップ）
-async function loadPagesMeta(){
-  const v=Date.now(); // キャッシュバスター（設計書8.7-5）
-  async function tryJson(path){
-    try{
-      const r=await fetch(path+'?v='+v,{cache:'no-store'});
-      if(!r.ok) return null;
-      return await r.json();
-    }catch(e){ return null; }
-  }
-  const [latest, quality, sources]=await Promise.all([
-    tryJson('data/latest.json'), tryJson('data/data_quality.json'), tryJson('data/sources.json'),
-  ]);
-  _pagesLatest=latest; _pagesQuality=quality;
-  if(sources?.sources) SOURCE_LINKS=Object.assign({},SOURCE_LINKS,sources.sources);
-  if(latest){
-    const el=document.getElementById('pagesMeta');
-    const dq=latest.data_quality||{};
-    const st=dq.status==='ok'?'🟢':dq.status==='partial'?'🟡':'🔴';
-    el.innerHTML=`📦 データ基盤connected: <b>${latest.model_version||'-'}</b>`
-      +` ｜ 更新 ${latest.updated_at||'-'} ｜ データ日 ${latest.data_date||'-'}`
-      +` ｜ 品質 ${st} ${dq.status||'-'}`;
-    el.style.display='';
-    document.getElementById('tabJson').style.borderColor='#3B82D8';
-    // バッチ側で検出済みの失敗をバナー表示
-    const issues=(dq.missing_items||[]).map(m=>({item:m.item,message:m.message,link:m.source_link}))
-      .concat((dq.warnings||[]).map(m=>({item:m.item,message:m.message,link:m.source_link,warn:true})));
-    if(issues.length) showQualityBanner(issues);
-  }
-}
-
-// ── 失敗通知バナー ──
-function linkHtmlFor(itemKey){
-  const src=SOURCE_LINKS[itemKey];
-  if(!src||!src.links) return '';
-  return src.links.map(l=>`<a href="${l.url}" target="_blank" rel="noopener" style="color:#7B74E0;margin-left:8px">↗ ${l.name}</a>`).join('');
-}
-function showQualityBanner(issues){
-  if(!issues||!issues.length) return;
-  const list=document.getElementById('qualityList');
-  list.innerHTML=issues.map(it=>{
-    const label=SOURCE_LINKS[it.item]?.label||it.item;
-    const icon=it.warn?'📝':'❌';
-    const manual=it.manualValue!=null?`<span style="color:#1D9E75;margin-left:8px">→ 手動値 ${it.manualValue} を使用中</span>`:'';
-    return `<div>${icon} <b>${label}</b>：${it.message||'取得失敗'}${manual}${linkHtmlFor(it.item)}</div>`;
-  }).join('');
-  document.getElementById('qualityBanner').style.display='';
-}
-function hideQualityBanner(){ document.getElementById('qualityBanner').style.display='none'; }
-
-// ── 手動データ入力（localStorage・3日間有効） ──
-const MANUAL_FIELDS=[
-  {key:'vix',        label:'VIX（米恐怖指数）',      hint:'例: 15.8',  min:5,  max:90,  itemKey:'sentiment:vix'},
-  {key:'nk_vi',      label:'日経VI',                hint:'例: 18.2',  min:8,  max:90,  itemKey:'sentiment:nk_vi'},
-  {key:'put_call',   label:'Put/Call Ratio',        hint:'例: 0.85',  min:0.2,max:2.5, itemKey:'sentiment:put_call'},
-  {key:'fear_greed', label:'Fear & Greed（0-100）', hint:'例: 55',    min:0,  max:100, itemKey:'sentiment:fear_greed'},
-  {key:'shiller_per',label:'シラーPER（参考表示）',   hint:'例: 32.5',  min:5,  max:60,  itemKey:'fundamental:shiller_per'},
-];
-const MANUAL_TTL_DAYS=3;
-function loadManualData(){
-  try{
-    const d=JSON.parse(localStorage.getItem('mhs_manual')||'{}');
-    const now=Date.now(), ttl=MANUAL_TTL_DAYS*86400e3;
-    let changed=false;
-    for(const k of Object.keys(d)){
-      if(!d[k]||now-(d[k].ts||0)>ttl){ delete d[k]; changed=true; }
-    }
-    if(changed) localStorage.setItem('mhs_manual',JSON.stringify(d));
-    return d;
-  }catch(e){ return {}; }
-}
-function openManualModal(){
-  const data=loadManualData();
-  document.getElementById('manualFields').innerHTML=MANUAL_FIELDS.map(f=>{
-    const cur=data[f.key];
-    const curTxt=cur?`保存済: ${cur.value}（${new Date(cur.ts).toLocaleDateString('ja-JP')}）`:'';
-    return `<div style="margin-bottom:12px">
-      <div style="display:flex;justify-content:space-between;align-items:baseline">
-        <label style="font-size:12px;color:var(--t1);font-weight:500">${f.label}</label>
-        <span style="font-size:10px;color:var(--t3)">${curTxt}</span>
-      </div>
-      <div style="display:flex;gap:6px;align-items:center;margin-top:4px">
-        <input type="number" step="any" id="mi_${f.key}" placeholder="${f.hint}" value="${cur?cur.value:''}"
-          style="flex:1;background:var(--bg);border:.5px solid var(--bd2);border-radius:6px;color:var(--t1);padding:8px 10px;font-size:13px;outline:none"/>
-        <span style="font-size:10px">${linkHtmlFor(f.itemKey)}</span>
-      </div>
-    </div>`;
-  }).join('');
-  document.getElementById('manualModal').style.display='flex';
-}
-function saveManualModal(){
-  const data=loadManualData();
-  MANUAL_FIELDS.forEach(f=>{
-    const raw=document.getElementById('mi_'+f.key).value.trim();
-    if(raw===''){ delete data[f.key]; return; }
-    const v=parseFloat(raw);
-    if(isNaN(v)||v<f.min||v>f.max){ delete data[f.key]; return; }
-    data[f.key]={value:v,ts:Date.now()};
-  });
-  localStorage.setItem('mhs_manual',JSON.stringify(data));
-  document.getElementById('manualModal').style.display='none';
-  run(true); // 再計算
-}
-
-// ── 感情指標フォールバック統合 ──
-// 優先順位: ①ライブAPI → ②Pages JSON(latest.json) → ③手動入力
-// 置換時は _src フラグを付与し、失敗＋補完状況をバナーに集約表示する
-function applySentimentFallbacks(sentiment, market){
-  const manual=loadManualData();
-  const pj=_pagesLatest?.sentiment_latest||{};
-  const issues=[];
-  function fb(cur, jsonVal, manKey, itemKey, mk){
-    if(cur) return cur;                              // ①ライブ成功
-    if(jsonVal&&jsonVal.value!=null){                // ②Pages JSON
-      issues.push({item:itemKey,message:`ライブ取得失敗 → バッチJSON値(${jsonVal.date})で代替`,warn:true});
-      return Object.assign({_src:'json'}, mk(jsonVal.value));
-    }
-    if(manual[manKey]){                              // ③手動入力
-      issues.push({item:itemKey,message:'ライブ取得失敗',manualValue:manual[manKey].value});
-      return Object.assign({_src:'manual'}, mk(manual[manKey].value));
-    }
-    issues.push({item:itemKey,message:'取得失敗（下記リンクで確認し手動入力できます）'});
-    return null;
-  }
-  const vixItem=market==='JP'?'sentiment:nk_vi':'sentiment:vix';
-  const vixKey =market==='JP'?'nk_vi':'vix';
-  sentiment.vix=fb(sentiment.vix, market==='JP'?pj.nk_vi:pj.vix, vixKey, vixItem, v=>({price:v,name:'manual'}));
-  if(market==='US'){
-    sentiment.pcr=fb(sentiment.pcr, pj.put_call, 'put_call', 'sentiment:put_call', v=>({ratio:v}));
-    sentiment.fg =fb(sentiment.fg,  pj.fear_greed,'fear_greed','sentiment:fear_greed', v=>({score:v,rating:''}));
-  }
-  return issues;
-}
-
-// ── JSON(Pages)データソース: history_1y.json から価格系列を取得 ──
-async function fetchPages(sym){
-  if(!_pagesHistory){
-    try{
-      const r=await fetch('data/history_1y.json?v='+Date.now(),{cache:'no-store'});
-      if(!r.ok) throw new Error('HTTP '+r.status);
-      _pagesHistory=await r.json();
-    }catch(e){
-      throw new Error('data/history_1y.json の読込に失敗しました（'+e.message+'）。\n'
-        +'GitHub Pages上で開いているか、バッチが実行済みか確認してください。\n'
-        +'ローカルで試す場合: python batch/main.py 実行後、python -m http.server で開く');
-    }
-  }
-  const entry=_pagesHistory.symbols?.[sym];
-  if(!entry||!entry.prices||entry.prices.length<55){
-    const avail=Object.keys(_pagesHistory.symbols||{}).join(', ')||'なし';
-    throw new Error(`JSON内に ${sym} のデータがありません。利用可能: ${avail}`);
-  }
-  const P=entry.prices;
-  const n=P.length;
-  return{
-    closes:P.map(p=>p.close), highs:P.map(p=>p.high??p.close),
-    lows:P.map(p=>p.low??p.close), volumes:P.map(p=>p.volume??0),
-    meta:{price:P[n-1].close, prev:P[n-2].close, symbol:sym,
-          name:sym+' (Pages JSON: '+(_pagesHistory.updated_at||'').slice(0,10)+')'}
-  };
-}
-
 // ── 検索履歴（手入力で検索した銘柄コードを記録）──
 const SRC_LABEL={yahoo:'Yahoo',av:'AlphaV',fh:'Finnhub'};
 let searchHistory=[];
@@ -606,6 +614,38 @@ function saveSearchHistory(code,srcVal,name){
   searchHistory=searchHistory.slice(0,12);
   try{ localStorage.setItem('sp500_history',JSON.stringify(searchHistory)); }catch(e){}
   renderHistoryChips();
+renderFavorites();
+// ファンダ永続データをDOM入力欄に復元
+(function(){ const m=FundPersist.getManual(); if(m) applyManualToDOM(m); })();
+
+
+
+// ── v3: ファンダ手入力の配線 ──
+function recomputeFromCache(){
+  const sym=getCurSym(), key=cacheKeyFor(src,sym);
+  if(!dataCache.has(key)) return;
+  const c=dataCache.get(key);
+  try{
+    const data=clean(c.raw);
+    const result=analyse(data,c.sentiment,c.market,c.fundAuto);
+    c.result=result; _lastResult=result;
+    renderResult(result);
+  }catch(e){}
+}
+window.addEventListener('DOMContentLoaded',()=>{
+  loadFundManual();
+  // FRED APIキーとJSON URL の復元・保存
+  const fredEl=document.getElementById('iFredKey');
+  const urlEl=document.getElementById('iFundUrl');
+  try{fredEl.value=localStorage.getItem('sp500_fred_key')||'';}catch(e){}
+  try{urlEl.value=localStorage.getItem(CONFIG.fundJsonKey)||'';}catch(e){}
+  fredEl.addEventListener('change',()=>{try{localStorage.setItem('sp500_fred_key',fredEl.value.trim());}catch(e){}});
+  urlEl.addEventListener('change',()=>{try{localStorage.setItem(CONFIG.fundJsonKey,urlEl.value.trim());}catch(e){}});
+  document.querySelectorAll('.fund-in').forEach(el=>{
+    el.addEventListener('change',()=>{ el.dataset.manual='1'; saveFundManual(); recomputeFromCache(); });
+    el.addEventListener('focus',()=>{ el.dataset.manual='1'; });
+  });
+});
 }
 function renderHistoryChips(){
   const wrap=document.getElementById('historyWrap');
@@ -714,6 +754,11 @@ function getCurSym(){
 
 document.getElementById('btnFetch').addEventListener('click',()=>run(false));
 document.getElementById('btnReload').addEventListener('click',()=>run(true));
+document.getElementById('btnFundReload').addEventListener('click',()=>runFundOnly());
+document.getElementById('btnFav').addEventListener('click',()=>{
+  const sym=getCurSym(),c=src==='yahoo'?sym.y:(sym.a||sym.y);
+  Favorites.toggle(c,src,sym.name); updateFavBtn(); renderFavorites();
+});
 if(avKey) document.getElementById('iKeyAV').value=avKey;
 document.getElementById('btnClearHist').addEventListener('click',()=>{
   searchHistory=[];
@@ -721,23 +766,6 @@ document.getElementById('btnClearHist').addEventListener('click',()=>{
   renderHistoryChips();
 });
 if(fhKey) document.getElementById('iKeyFH').value=fhKey;
-
-// ── データ品質バナー・手動入力モーダルの配線 ──
-document.getElementById('btnManualInput').addEventListener('click',openManualModal);
-document.getElementById('btnQualityClose').addEventListener('click',hideQualityBanner);
-document.getElementById('btnManualClose').addEventListener('click',()=>{
-  document.getElementById('manualModal').style.display='none';
-});
-document.getElementById('btnManualSave').addEventListener('click',saveManualModal);
-document.getElementById('btnManualClear').addEventListener('click',()=>{
-  try{ localStorage.removeItem('mhs_manual'); }catch(e){}
-  openManualModal(); // 再描画
-});
-document.getElementById('manualModal').addEventListener('click',e=>{
-  if(e.target.id==='manualModal') document.getElementById('manualModal').style.display='none';
-});
-// 起動時にGitHub Pages上のバッチJSONメタ情報を読込（未配置なら何もしない）
-loadPagesMeta();
 
 
 
@@ -768,7 +796,9 @@ async function fetchYahoo(sym){
         if(!j.chart?.result?.[0]){lastErr='データなし'; continue;}
         const res=j.chart.result[0], q=res.indicators.quote[0];
         const dispName=res.meta.shortName||res.meta.longName||sym;
-        return{closes:q.close,highs:q.high,lows:q.low,volumes:q.volume,
+        const ts=res.timestamp||[];
+        const dates=ts.map(t=>new Date(t*1000).toISOString().slice(0,10));
+        return{closes:q.close,highs:q.high,lows:q.low,volumes:q.volume,dates,
                meta:{price:res.meta.regularMarketPrice,prev:res.meta.chartPreviousClose,
                      symbol:sym,name:dispName}};
       }catch(e){lastErr=e.message; continue;}
@@ -884,7 +914,7 @@ async function fetchFH(key, sym){
     if(j.error){
       throw new Error(
         `Finnhub アクセス拒否: "${j.error}"\n`
-        +'無料プランでは /stock/candle が制限されています。\n'
+        +'Finnhub無料プランでは指数(^GSPC等)の/stock/candleが利用不可です。\n'
         +'Alpha Vantage または Yahoo Finance をお試しください。'
       );
     }
@@ -990,7 +1020,8 @@ async function fetchSentiment(market){
   return{
     vix: vixR.status==='fulfilled'?vixR.value:null,
     fg:  fgR.status==='fulfilled'?fgR.value:null,
-    pcr: pcrR.status==='fulfilled'?pcrR.value:null,
+    pcr: pcrR.status==='fulfilled'&&pcrR.value?pcrR.value:
+         (_fundJson?.indicators?.pcr?{ratio:_fundJson.indicators.pcr.value}:null),
     market,
   };
 }
@@ -1508,8 +1539,6 @@ function computeLayer2(C,H,L,V,regime){
 
   const items=[
     {name:'RSI(14)',         cat:'price', val:rsiV,    e:ext(rsiV,50,100,0),                    type:'osc', disp:fv2(rsiV,1),    i:iRSI(rsiV),    w:W.rsi},
-    {name:'CCI(20)',         cat:'price', val:cciV,    e:cciV==null?0:clamp1(cciV/200),          type:'osc', disp:cciV!=null?fv2(cciV,1):'—', i:iCCI(cciV), w:W.cci},
-    {name:'Stochastic%K(14)',cat:'price', val:stochV,  e:ext(stochV,50,100,0),                   type:'osc', disp:fv2(stochV,1),  i:iStoch(stochV),w:W.stoch},
     {name:'Z-SCORE(50d)',    cat:'price', val:pzV,     e:pzV==null?0:clamp1(pzV/2.5),            type:'dev', disp:fp2(pzV,2),     i:iPZ(pzV),      w:W.pz},
     {name:'50日MA乖離率',    cat:'price', val:ma50d,   e:ma50d==null?0:clamp1(ma50d/12),         type:'dev', disp:fp2(ma50d,2)+'%',i:iDev(ma50d,'50日MA'),w:W.ma50d},
     {name:'MFI(14)',         cat:'volume',val:mfiV,    e:ext(mfiV,50,100,0),                     type:'osc', disp:fv2(mfiV,1),    i:iMFI(mfiV),    w:W.mfi},
@@ -1548,6 +1577,7 @@ function computeLayer2(C,H,L,V,regime){
     topScore,bottomScore,items,
     categories:CATS.map(c=>({label:c.label,items:items.filter(it=>it.cat===c.key)})),
     regimeMult:{oscMult,devMult},
+    vals:{ pz:pzV, ma50d:ma50d, atr:atrV?atrV.ratio:null },  // v3.1: 深度D値計算用の生値 (atrは比率のみ)
   };
 }
 // ─── Layer2 解釈テキスト関数（復元）─────────────────────────────────
@@ -1705,6 +1735,242 @@ function computeLayer3(C,H,L,V){
   return{score,items};
 }
 
+
+/* ═══════════════════════════════════════════════
+   FUNDAMENTAL (v3): ファンダメンタル環境スコア
+   自動取得: MOVE(^MOVE)・WTI(CL=F)・銅(HG=F)・ドル指数(DX-Y.NYB)
+             → 252日Zスコアを算出（レベル値は採点に使わない）
+   手入力  : HYスプレッド・シラーPER・PER(TTM)・イールドカーブ(10y-2y)・ISM
+             （Yahooで取得できない指標。localStorageに保存）
+   出力    : 大底スコア/天井スコア(各0-100・利用可能項目で自動正規化)
+═══════════════════════════════════════════════ */
+async function fetchYahooCloses(sym,range='1y'){
+  const bases=[
+    `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=${range}`,
+    `https://query2.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=${range}`,
+  ];
+  const mks=[u=>u,
+    u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u),
+    u=>'https://corsproxy.io/?'+encodeURIComponent(u)];
+  for(const base of bases) for(const mk of mks){
+    try{
+      const r=await fetch(mk(base));
+      if(!r.ok) continue;
+      const j=await r.json();
+      const res=j.chart?.result?.[0];
+      const c=res?.indicators?.quote?.[0]?.close;
+      if(!c) continue;
+      const closes=c.filter(x=>x!=null);
+      if(closes.length<60) continue;
+      return closes;
+    }catch(e){continue;}
+  }
+  return null;
+}
+function zLast(closes,win=252){
+  const sl=closes.slice(-Math.min(win,closes.length));
+  if(sl.length<60) return null;
+  const m=sl.reduce((a,b)=>a+b,0)/sl.length;
+  const sd=Math.sqrt(sl.reduce((a,b)=>a+(b-m)**2,0)/sl.length);
+  return sd===0?0:(sl[sl.length-1]-m)/sd;
+}
+let _fundAuto=null,_fundAutoAt=0,_fundJson=null,_fundJsonAt=0;
+
+/* GitHub上のfundamentals.jsonを取得 → 手入力欄を自動入力 + Yahoo系データを返す */
+async function fetchFundJsonFromGitHub(){
+  // URL: 入力欄 → localStorage の順で取得
+  let url='';
+  const urlEl=document.getElementById('iFundUrl');
+  if(urlEl&&urlEl.value.trim()) url=urlEl.value.trim();
+  if(!url) try{url=localStorage.getItem(CONFIG.fundJsonKey)||'';}catch(e){}
+  if(url){try{localStorage.setItem(CONFIG.fundJsonKey,url);}catch(e){}}
+  if(!url){
+    console.log('fundamentals.json: URL未設定');
+    return null;
+  }
+  console.log('fundamentals.json取得中:',url);
+  try{
+    const r=await fetch(url+'?t='+Date.now());
+    if(!r.ok){console.warn('fundamentals.json取得失敗:',r.status); return null;}
+    const j=await r.json();
+    console.log('fundamentals.json取得成功:',Object.keys(j.indicators||{}).length,'指標');
+    return j;
+  }catch(e){console.warn('fundamentals.json取得エラー:',e.message); return null; }
+}
+
+/* FRED API直接取得 (アプリ内フォールバック用) */
+async function fetchFredDirect(seriesId){
+  // FRED APIは無料・CORS対応 — APIキーはlocalStorageから
+  let key=''; try{key=localStorage.getItem('sp500_fred_key')||'';}catch(e){}
+  if(!key) return null;
+  try{
+    const url=`https://api.stlouisfed.org/fred/series/observations?series_id=${seriesId}&api_key=${key}&file_type=json&sort_order=desc&limit=3`;
+    const r=await fetch(url);
+    const j=await r.json();
+    const obs=(j.observations||[]).filter(o=>o.value!=='.');
+    return obs.length?{value:parseFloat(obs[0].value), date:obs[0].date}:null;
+  }catch(e){ return null; }
+}
+
+async function fetchFundamentalAuto(force){
+  if(!force && _fundAuto && Date.now()-_fundAutoAt<30*60*1000) return _fundAuto;
+
+  // Step1: GitHub JSON (バッチ結果)
+  let gj=null;
+  if(!force || !_fundJson || Date.now()-_fundJsonAt>10*60*1000){
+    gj=await fetchFundJsonFromGitHub();
+    if(gj){_fundJson=gj; _fundJsonAt=Date.now();}
+    else gj=_fundJson;
+  }else gj=_fundJson;
+
+  const out={};
+
+  // Step2: JSONからYahoo系を読み込み
+  if(gj?.indicators){
+    const gi=gj.indicators;
+    for(const [k,sym] of [['move','^MOVE'],['wti','CL=F'],['copper','HG=F'],['dxy','DX-Y.NYB']]){
+      if(gi[k]) out[k]={last:gi[k].value, z:gi[k].z||0};
+    }
+    // 手入力欄を自動入力(JSONの値で埋める、ユーザーが手動で上書き可)
+    const autoFill=[
+      ['fHY', gi.hy_spread?.value],
+      ['fShiller', gi.shiller_pe?.value],
+      ['fPER', gi.pe_ttm?.value],
+      ['fYC', gi.yield_curve?.value],
+      ['fISM', gi.ism?.value],
+      ['fISMprev', gi.ism_prev?.value],
+      ['fPCR', gi.pcr?.value],
+    ];
+    for(const [id, val] of autoFill){
+      if(val==null) continue;
+      const el=document.getElementById(id);
+      if(!el) continue;
+      // ユーザーが手動入力済み(manual flagが立っている)ならスキップ
+      if(el.dataset.manual==='1') continue;
+      el.value=val;
+    }
+    // autoFill後にlocalStorageに同期(analyseで読めるように)
+    saveFundManual();
+    // 更新日時を表示
+    const updEl=document.getElementById('fundUpdateInfo');
+    if(updEl && gj.updated_at){
+      const d=new Date(gj.updated_at);
+      updEl.textContent=`最終自動取得: ${d.toLocaleDateString('ja-JP')} ${d.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}`;
+    }
+  }
+
+  // Step3: JSONにYahoo系がない場合はYahoo直接取得(フォールバック)
+  const syms={move:'^MOVE', wti:'CL=F', copper:'HG=F', dxy:'DX-Y.NYB'};
+  const missing=Object.keys(syms).filter(k=>!out[k]);
+  if(missing.length){
+    const rs=await Promise.allSettled(missing.map(k=>fetchYahooCloses(syms[k])));
+    missing.forEach((k,i)=>{
+      const closes=rs[i].status==='fulfilled'?rs[i].value:null;
+      if(closes) out[k]={last:closes[closes.length-1], z:zLast(closes)};
+    });
+  }
+
+  // Step4: FRED直接取得(フォールバック — HY/YC/ISM がJSONにもなく手入力もない場合)
+  const fredFallbacks=[
+    ['fHY','BAMLH0A0HYM2'], ['fYC','T10Y2Y'],
+  ];
+  for(const [id, sid] of fredFallbacks){
+    const el=document.getElementById(id);
+    if(!el || el.value) continue;  // 既に値がある
+    const fr=await fetchFredDirect(sid);
+    if(fr){ el.value=fr.value; }
+  }
+
+  _fundAuto=out; _fundAutoAt=Date.now();
+  return out;
+}
+// ── 手入力値（HY・シラー・PERttm・イールドカーブ・ISM）──
+const FUND_MANUAL_KEY='sp500_fund_manual_v3';
+function getFundManual(){
+  const g=id=>{const el=document.getElementById(id);
+    if(!el) return null; const v=parseFloat(el.value); return isNaN(v)?null:v;};
+  return{hy:g('fHY'), shiller:g('fShiller'), perTtm:g('fPER'), ycurve:g('fYC'),
+         ism:g('fISM'), ismPrev:g('fISMprev')};
+}
+function loadFundManual(){
+  let v={}; try{v=JSON.parse(localStorage.getItem(FUND_MANUAL_KEY)||'{}');}catch(e){}
+  [['fHY','hy'],['fShiller','shiller'],['fPER','perTtm'],['fYC','ycurve'],['fISM','ism'],['fISMprev','ismPrev']]
+    .forEach(([id,k])=>{const el=document.getElementById(id); if(el&&v[k]!=null)el.value=v[k];});
+}
+function saveFundManual(){
+  try{localStorage.setItem(FUND_MANUAL_KEY,JSON.stringify(getFundManual()));}catch(e){}
+}
+const rampF=(x,a,b)=>Math.max(0,Math.min(1,(x-a)/(b-a)));
+
+function computeFundamental(auto,manual){
+  auto=auto||{}; manual=manual||{};
+  const Wb=CONFIG.fundWeights.bottom, Wt=CONFIG.fundWeights.top;
+  const hy=manual.hy, sh=manual.shiller, per=manual.perTtm, yc=manual.ycurve;
+  const ism=manual.ism, chg=(manual.ism!=null&&manual.ismPrev!=null)?manual.ism-manual.ismPrev:null;
+  const mv=auto.move?auto.move.last:null;
+  const cz=auto.copper?auto.copper.z:null;
+  const wz=auto.wti?auto.wti.z:null;
+  const dz=auto.dxy?auto.dxy.z:null;
+
+  // 大底側の証拠（0〜1）— クレジット/パニック系のみ（第1レポート4章・第2レポート3章）
+  const B=[
+    {k:'hy',     name:'HYスプレッド',        w:Wb.hy,     v:hy, s:hy==null?null:rampF(hy,5,10),        d:hy==null?'—':hy.toFixed(2)+'%',  src:{t:'FRED BAMLH0A0HYM2',u:'https://fred.stlouisfed.org/series/BAMLH0A0HYM2'}, i:'≧5%から加点、10%で満点(危機水準)'},
+    {k:'move',   name:'MOVE指数',            w:Wb.move,   v:mv, s:mv==null?null:rampF(mv,120,170),      d:mv==null?'取得不可':mv.toFixed(1), src:{t:'Yahoo ^MOVE (自動)',u:'https://finance.yahoo.com/quote/%5EMOVE/'}, i:'≧120から加点(債券パニック)'},
+    {k:'copperZ',name:'銅先物 Z(252d)',      w:Wb.copperZ,v:cz, s:cz==null?null:rampF(-cz,1,3),         d:cz==null?'取得不可':cz.toFixed(2)+'σ', src:{t:'Yahoo HG=F (自動)',u:'https://finance.yahoo.com/quote/HG%3DF/'}, i:'-1σから加点(景気総悲観)'},
+    {k:'wtiZ',   name:'WTI原油 Z(252d)',     w:Wb.wtiZ,   v:wz, s:wz==null?null:rampF(-wz,1,3),         d:wz==null?'取得不可':wz.toFixed(2)+'σ', src:{t:'Yahoo CL=F (自動)',u:'https://finance.yahoo.com/quote/CL%3DF/'}, i:'-1σから加点'},
+    {k:'dxyZ',   name:'ドル指数 Z(252d)',    w:Wb.dxyZ,   v:dz, s:dz==null?null:rampF(dz,1,2.5),        d:dz==null?'取得不可':dz.toFixed(2)+'σ', src:{t:'Yahoo DX-Y.NYB (自動)',u:'https://finance.yahoo.com/quote/DX-Y.NYB/'}, i:'+1σから加点(危機のドル逃避)'},
+    {k:'ismChg', name:'ISM改善転換',         w:Wb.ismChg, v:chg,s:(ism==null||chg==null)?null:(ism<50&&chg>0?rampF(chg,0,2):0), d:chg==null?'—':(ism<50&&chg>0?`${ism}へ+${chg.toFixed(1)}`:'条件外'), src:{t:'ISM PMI',u:'https://www.ismworld.org/supply-management-news-and-reports/reports/ism-report-on-business/'}, i:'ISM50未満からの改善で加点'},
+    {k:'perTtm', name:'PER(TTM)低位',        w:Wb.perTtm, v:per,s:per==null?null:rampF(16-per,0,4),     d:per==null?'—':per.toFixed(1)+'倍', src:{t:'multpl.com',u:'https://www.multpl.com/s-p-500-pe-ratio'}, i:'16倍以下から加点'},
+  ];
+  // 天井側の証拠 — バリュエーション+金利構造+自己満足(complacency)
+  const T=[
+    {k:'shiller',name:'シラーPER',           w:Wt.shiller,v:sh, s:sh==null?null:rampF(sh,30,40),        d:sh==null?'—':sh.toFixed(1)+'倍', src:{t:'multpl.com',u:'https://www.multpl.com/shiller-pe'}, i:'30倍から加点(SPY天井の75%で成立)'},
+    {k:'perTtm', name:'PER(TTM)高位',        w:Wt.perTtm, v:per,s:per==null?null:rampF(per,22,28),      d:per==null?'—':per.toFixed(1)+'倍', src:{t:'multpl.com',u:'https://www.multpl.com/s-p-500-pe-ratio'}, i:'22倍から加点'},
+    {k:'ycurve', name:'逆イールド(10y-2y)',  w:Wt.ycurve, v:yc, s:yc==null?null:rampF(-yc,0,0.75),      d:yc==null?'—':(yc>=0?'+':'')+yc.toFixed(2)+'%', src:{t:'FRED T10Y2Y',u:'https://fred.stlouisfed.org/series/T10Y2Y'}, i:'逆転(<0)から加点(S級暴落前は100%先行)'},
+    {k:'hyLow',  name:'HY自己満足',          w:Wt.hyLow,  v:hy, s:hy==null?null:rampF(3.5-hy,0,1.2),    d:hy==null?'—':hy.toFixed(2)+'%',  src:{t:'FRED BAMLH0A0HYM2',u:'https://fred.stlouisfed.org/series/BAMLH0A0HYM2'}, i:'3.5%以下から加点(クレジット凪)'},
+    {k:'moveLow',name:'MOVE低位',            w:Wt.moveLow,v:mv, s:mv==null?null:rampF(80-mv,0,25),      d:mv==null?'取得不可':mv.toFixed(1), src:{t:'Yahoo ^MOVE (自動)',u:'https://finance.yahoo.com/quote/%5EMOVE/'}, i:'80以下から加点(債券市場の油断)'},
+    {k:'ismChg', name:'ISM高位からの低下',   w:Wt.ismChg, v:chg,s:(ism==null||chg==null)?null:(ism>55&&chg<0?rampF(-chg,0,2):0), d:chg==null?'—':(ism>55&&chg<0?`${ism}へ${chg.toFixed(1)}`:'条件外'), src:{t:'ISM PMI',u:'https://www.ismworld.org/supply-management-news-and-reports/reports/ism-report-on-business/'}, i:'ISM55超からの低下で加点'},
+    {k:'copperZ',name:'銅の過熱',            w:Wt.copperZ,v:cz, s:cz==null?null:rampF(cz,1.5,3),        d:cz==null?'取得不可':cz.toFixed(2)+'σ', src:{t:'Yahoo HG=F (自動)',u:'https://finance.yahoo.com/quote/HG%3DF/'}, i:'+1.5σから加点'},
+  ];
+  function agg(items){
+    const av=items.filter(it=>it.s!=null);
+    const wSum=av.reduce((a,b)=>a+b.w,0);
+    if(wSum===0) return{score:null,availW:0};
+    const s=av.reduce((a,b)=>a+b.s*b.w,0)/wSum*100;
+    return{score:Math.round(s*10)/10, availW:wSum};
+  }
+  const b=agg(B), t=agg(T);
+  const ok=b.availW>0&&t.availW>0;
+  const overall=ok?Math.round((50+((t.score)-(b.score))/2)*10)/10:null;
+  return{bottomScore:b.score, topScore:t.score, overall, ok,
+         availB:b.availW, availT:t.availW, itemsB:B, itemsT:T,
+         manualUsed:Object.values(manual).some(v=>v!=null)};
+}
+
+/* ── 統合(v3): テク+需給 と ファンダ を分離集計→合算 ──
+   ・テク+需給 大底/天井 = Layer2(0.55)+Layer3(0.25)+Layer4(0.20) の底/天井成分
+   ・全総合 大底 = 0.70×テク需給 + 0.30×ファンダ / 天井 = 0.55 + 0.45（CONFIG.blend）
+   ・各総合 = 50 + (天井 − 大底)/2   （0=大底圏〜100=天井圏） */
+function computeIntegration(layer2,layer3,layer4,fund){
+  const W=CONFIG.layerWeights, BL=CONFIG.blend;
+  const l3b=Math.max(0,50-layer3.score)*2, l3t=Math.max(0,layer3.score-50)*2;
+  const hasL4=layer4.availMax>0;
+  const l4b=hasL4?Math.max(0,50-layer4.score)*2:0, l4t=hasL4?Math.max(0,layer4.score-50)*2:0;
+  const wSum=W.base+W.confirmation+(hasL4?W.sentiment:0);
+  const r1=x=>Math.round(x*10)/10;
+  const tqBottom=r1((W.base*layer2.bottomScore+W.confirmation*l3b+(hasL4?W.sentiment*l4b:0))/wSum);
+  const tqTop   =r1((W.base*layer2.topScore   +W.confirmation*l3t+(hasL4?W.sentiment*l4t:0))/wSum);
+  const tqOverall=r1(50+(tqTop-tqBottom)/2);
+  const fundOk=!!(fund&&fund.ok);
+  const allBottom=fundOk?r1(BL.bottom.tq*tqBottom+BL.bottom.fund*fund.bottomScore):tqBottom;
+  const allTop   =fundOk?r1(BL.top.tq*tqTop      +BL.top.fund*fund.topScore):tqTop;
+  const allOverall=r1(50+(allTop-allBottom)/2);
+  return{tqBottom,tqTop,tqOverall,
+         fundBottom:fundOk?fund.bottomScore:null, fundTop:fundOk?fund.topScore:null,
+         fundOverall:fundOk?fund.overall:null, fundOk,
+         allBottom,allTop,allOverall};
+}
+
 /* ═══════════════════════════════════════════════
    LAYER 4: 市場心理
    VIX / Put-Call Ratio / Fear&Greed / 新高値新安値比率
@@ -1712,14 +1978,16 @@ function computeLayer3(C,H,L,V){
 ═══════════════════════════════════════════════ */
 function computeLayer4(sentiment,hiloProxy,market){
   const vixS=scoreVIX(sentiment.vix,market), vixOk=sentiment.vix?.price!=null;
-  const pcrS=scorePCR(sentiment.pcr), pcrOk=!!sentiment.pcr;
+  let pcrVal=sentiment.pcr;
+  if(!pcrVal){const el=document.getElementById('fPCR');if(el&&el.value)pcrVal={ratio:parseFloat(el.value)};}
+  const pcrS=scorePCR(pcrVal), pcrOk=!!pcrVal;
   const fgS=scoreFG(sentiment.fg), fgOk=!!sentiment.fg;
   const hiloS=scoreHILO(hiloProxy), hiloOk=hiloProxy!=null;
-  const tag=o=>o?._src==='manual'?' ✏️手動':o?._src==='json'?' 📦JSON':'';
   const items=[
-    {name:'VIX'+(market==='JP'?'(^JNIV)':'(^VIX)'), maxW:8, s:vixS, ok:vixOk, disp:(vixOk?sentiment.vix.price.toFixed(1):'取得不可')+tag(sentiment.vix), i:iVIX(sentiment.vix,market)},
-    {name:'Put/Call Ratio', maxW:6, s:pcrS, ok:pcrOk, disp:(pcrOk?sentiment.pcr.ratio.toFixed(2):'取得不可(米国のみ)')+tag(sentiment.pcr), i:iPCR(sentiment.pcr)},
-    {name:'Fear & Greed',   maxW:4, s:fgS,  ok:fgOk,  disp:(fgOk?sentiment.fg.score.toFixed(0):'取得不可(米国のみ)')+tag(sentiment.fg), i:iFG(sentiment.fg)},
+    {name:'VIX'+(market==='JP'?'(^JNIV)':'(^VIX)'), maxW:8, s:vixS, ok:vixOk, disp:vixOk?sentiment.vix.price.toFixed(1):'取得不可', i:iVIX(sentiment.vix,market)},
+    {name:'Put/Call Ratio', maxW:6, s:pcrS, ok:pcrOk, disp:pcrOk?sentiment.pcr.ratio.toFixed(2):
+        (document.getElementById('fPCR')?.value?document.getElementById('fPCR').value+'(手入力)':'取得不可'), i:iPCR(sentiment.pcr)},
+    {name:'Fear & Greed',   maxW:4, s:fgS,  ok:fgOk,  disp:fgOk?sentiment.fg.score.toFixed(0):'取得不可(米国のみ)', i:iFG(sentiment.fg)},
     {name:'新高値新安値比率(proxy)', maxW:4, s:hiloS, ok:hiloOk, disp:hiloOk?(hiloProxy*100).toFixed(0)+'%':'—', i:iHILO(hiloProxy)},
   ];
   const availMax=items.filter(it=>it.ok).reduce((a,b)=>a+b.maxW,0);
@@ -1735,16 +2003,65 @@ function computeLayer4(sentiment,hiloProxy,market){
    ・Bottom/Top Score高くてもConfirmation低ければConfidence低
    ・Bottom・Confirmation・Sentimentが揃えばConfidence高
 ═══════════════════════════════════════════════ */
-function computeLayer5(layer2,layer3,layer4,regime){
+/* ── v3.1: 深度D値（青天井の二層目, 第4分析レポート） ──
+   0-100スコアの満点を超えた極値の深さを対数加点で測る。
+   コロナ2020/3実測 D≈23（A級パニック）、2018年末等のB級は0〜2。 */
+function computeDepth(layer2, sentiment, fundAuto){
+  const C=CONFIG.depth;
+  const parts=[];
+  function add(label, val, cfg, disp){
+    if(val==null||isNaN(val)) return 0;
+    const over=(cfg.neg?(cfg.full-val):(val-cfg.full))/cfg.span;
+    if(over<=0) return 0;
+    const pts=cfg.w*C.alpha*Math.log1p(over);
+    if(pts>=0.1) parts.push({label, disp:disp!=null?disp:val, pts:Math.round(pts*10)/10});
+    return pts;
+  }
+  const vix=sentiment?.vix?.price;
+  let dTq=0;
+  dTq+=add('VIX/日経VI', vix, C.tq.vol, vix!=null?vix.toFixed(1):null);
+  dTq+=add('50日乖離', layer2?.vals?.ma50d, C.tq.ma50d, layer2?.vals?.ma50d!=null?layer2.vals.ma50d.toFixed(1)+'%':null);
+  dTq+=add('ATR比', layer2?.vals?.atr, C.tq.atr, layer2?.vals?.atr!=null?layer2.vals.atr.toFixed(2):null);
+  dTq+=add('価格Z', layer2?.vals?.pz, C.tq.pz, layer2?.vals?.pz!=null?layer2.vals.pz.toFixed(2)+'σ':null);
+  let dF=0;
+  dF+=add('MOVE', fundAuto?.move?.last, C.fund.move, fundAuto?.move?fundAuto.move.last.toFixed(1):null);
+  dF+=add('銅Z', fundAuto?.copper?.z, C.fund.copperZ, fundAuto?.copper?fundAuto.copper.z.toFixed(2)+'σ':null);
+  dF+=add('WTI Z', fundAuto?.wti?.z, C.fund.wtiZ, fundAuto?.wti?fundAuto.wti.z.toFixed(2)+'σ':null);
+  const d=Math.round((C.blend.tq*dTq+C.blend.fund*dF)*10)/10;
+  const tier=d>=C.tiers.panic?'panic':d>=C.tiers.some?'some':'none';
+  parts.sort((a,b)=>b.pts-a.pts);
+  return{ d, dTq:Math.round(dTq*10)/10, dFund:Math.round(dF*10)/10, tier, parts };
+}
+
+/* 深度の履歴（ブラウザ保存）: 買いゾーン内でDが直近histN回の最大を更新したら買い増しトリガ */
+function updateDepthHistory(symbol, d, allOverall){
+  const C=CONFIG.depth;
+  let h={}; try{h=JSON.parse(localStorage.getItem(C.histKey)||'{}');}catch(e){}
+  const today=new Date().toISOString().slice(0,10);
+  const prev=(h[symbol]||[]).filter(x=>x.date!==today);
+  const recent=prev.slice(-C.histN);
+  const prevMax=recent.reduce((m,x)=>Math.max(m,x.d),0);
+  prev.push({date:today, d});
+  h[symbol]=prev.slice(-30);
+  try{localStorage.setItem(C.histKey,JSON.stringify(h));}catch(e){}
+  const inBuy=allOverall!=null&&allOverall<=CONFIG.zones.buy;
+  return{ newHigh: d>prevMax && d>=C.tiers.some && inBuy,
+          prevMax:Math.round(prevMax*10)/10, nHist:recent.length, inBuy };
+}
+
+function computeLayer5(layer2,layer3,layer4,regime,fund){
   const W=CONFIG.layerWeights;
   const hasL4=layer4.availMax>0;
+  const hasFund=!!(fund&&fund.ok);
   const layer2Net=50+(layer2.topScore-layer2.bottomScore)/2;
 
   // 各レイヤーを「票」に変換（-1=大底寄り, 0=中立, +1=天井寄り）
+  // v3: ファンダ環境も1票として加え、レイヤー間一致度(Confidence)に反映
   const votes=[
     {v:(layer2Net-50)/50,   w:W.base,         label:'Layer2'},
     {v:(layer3.score-50)/50,w:W.confirmation, label:'Layer3'},
     ...(hasL4?[{v:(layer4.score-50)/50,w:W.sentiment,label:'Layer4'}]:[]),
+    ...(hasFund?[{v:(fund.overall-50)/50,w:W.fundamental,label:'Fund'}]:[]),
   ];
   const wSum=votes.reduce((a,b)=>a+b.w,0);
 
@@ -1778,6 +2095,15 @@ function computeLayer5(layer2,layer3,layer4,regime){
   const opposition=-regimeDelta*scoreDelta;          // 正=逆方向
   const opposesTrend=opposition>0.1;
   if(opposition>0) confRaw-=Cv.regimePenalty*(opposition**0.7);
+  // v3: 弱気レジーム内の非対称補正（第2レポート第1章: 危険地帯はレンジ弱気のみ）
+  //  弱気×ADX低(≒range_bear)の底判定 → Confidence減点（ジワ下げの押し目買いを警戒）
+  //  弱気×ADX高(≒trend_bear/volatility)の底判定 → Confidence加点（下げ切り局面）
+  const adxV=regime?.components?.adx;
+  if(regimeDelta<-0.1 && scoreDelta<-0.1 && adxV!=null){
+    const RA=CONFIG.regimeAdjustment;
+    if(adxV<22)      confRaw-=RA.rangeBearBottomPenalty*Math.abs(scoreDelta);
+    else if(adxV>=28)confRaw+=RA.strongBearBottomBoost*Math.abs(scoreDelta);
+  }
 
   const confidence=Math.round(Math.max(5,Math.min(95,confRaw*100)));
 
@@ -1795,7 +2121,7 @@ function computeLayer5(layer2,layer3,layer4,regime){
 /* ═══════════════════════════════════════════════
    ANALYSIS ENGINE（5層統合）
 ═══════════════════════════════════════════════ */
-function analyse({closes:C,highs:H,lows:L,volumes:V,meta},sentiment={},market){
+function analyse({closes:C,highs:H,lows:L,volumes:V,meta},sentiment={},market,fundAuto=null){
   const n=C.length;
   if(n<55) throw new Error(`データ不足 (${n}日分)。最低55日必要。`);
   const cur=C[n-1], prv=C[n-2], pch=(cur-prv)/prv*100;
@@ -1822,10 +2148,13 @@ function analyse({closes:C,highs:H,lows:L,volumes:V,meta},sentiment={},market){
   const layer4=computeLayer4(sentiment,hiloProxy,mk);
 
   // ── Layer 5: 総合判定 ──
-  const layer5=computeLayer5(layer2,layer3,layer4,regime);
+  const fund=computeFundamental(fundAuto,getFundManual());
+  const integration=computeIntegration(layer2,layer3,layer4,fund);
+  const depth=computeDepth(layer2,sentiment,fundAuto);
+  const layer5=computeLayer5(layer2,layer3,layer4,regime,fund);
 
   return{
-    layer1:regime, layer2, layer3, layer4, layer5,
+    layer1:regime, layer2, layer3, layer4, layer5, fund, integration, depth,
     info:{cur,prev:meta.prev,pch,n,symbol:meta.symbol,name:meta.name,ma50,ma200,market:mk}
   };
 }
@@ -1968,7 +2297,7 @@ function renderHistoryChart(hist,days){
 }
 
 function renderResult(result){
-  const{layer1,layer2,layer3,layer4,layer5,info}=result;
+  const{layer1,layer2,layer3,layer4,layer5,fund,integration,info}=result;
   const{cur,prev,pch,n,symbol,name,ma50,ma200,market:mk}=info;
 
   // ── 価格ヘッダー ──
@@ -2055,9 +2384,72 @@ function renderResult(result){
     </div>`;
   }).join('');
 
-  /* ═══ LAYER 5 ═══ */
-  document.getElementById('gaugeSvg').innerHTML=renderGauge(layer5.score);
-  const vd=verdictInfo(layer5.score);
+  /* ═══ LAYER 5: ファンダメンタル環境 ═══ */
+  const fb=fund.bottomScore, ft=fund.topScore;
+  document.getElementById('gaugeFundB').innerHTML=renderSmallGauge(fb==null?0:fb,'#1D9E75','ファンダ大底'+(fb==null?'(データなし)':''));
+  document.getElementById('gaugeFundT').innerHTML=renderSmallGauge(ft==null?0:ft,'#D85A30','ファンダ天井'+(ft==null?'(データなし)':''));
+  const fundRow=(it)=>{
+    const on=it.s!=null&&it.s>0.02;
+    const c=it.s==null?'#7878a0':on?'#D8B830':'#9090b0';
+    const srcLink=it.src?`<a href="${it.src.u}" target="_blank" style="font-size:9.5px;color:var(--t3);text-decoration:none;margin-left:4px" title="${it.src.t}">📎${it.src.t}</a>`:'';
+    return`<div class="div-row">
+      <span style="color:var(--t1)">${it.name} <span style="font-size:10px;color:var(--t3)">w${it.w}</span>${srcLink}</span>
+      <span style="text-align:right">
+        <span style="font-family:'Courier New',monospace;color:${c};font-size:12.5px">${it.d}</span>
+        <span style="font-size:10.5px;color:${on?'#BA7517':'var(--t3)'};margin-left:6px">${it.s==null?'—':(it.s*100).toFixed(0)+'%'}</span>
+      </span>
+    </div>`;
+  };
+  document.getElementById('fundList').innerHTML=
+    `<div style="font-size:11px;color:#1D9E75;margin-bottom:2px">▼ 大底側の証拠</div>`+fund.itemsB.map(fundRow).join('')+
+    `<div style="font-size:11px;color:#D85A30;margin:8px 0 2px">▲ 天井側の証拠</div>`+fund.itemsT.map(fundRow).join('');
+
+  /* ═══ LAYER 6: 総合判定 (v3) ═══ */
+  const IG=integration;
+  document.getElementById('gaugeSvg').innerHTML=renderGauge(IG.allOverall);
+  const Z=CONFIG.zones;
+  document.getElementById('zoneNote').innerHTML=
+    `買いゾーン: 全総合≦${Z.buy} ／ 利確ゾーン: ≧${Z.exit}（バックテスト: ≦25買い→≧70売却が勝率77-86%で最良）<br>`+
+    `※ シグナル初日は1/3の打診に留め、深化で追加する分割エントリー推奨（第2分析「初日の罠」）`;
+  /* v3.1: 深度D値の表示 */
+  const depth=result.depth||{d:0,tier:'none',parts:[]};
+  const dh=updateDepthHistory(info.symbol, depth.d, IG.allOverall);
+  const tierCfg={
+    panic:{label:'A級パニック域', bg:'rgba(216,90,48,.15)', bd:'#D85A30', tc:'#E8A080'},
+    some: {label:'深度あり',       bg:'rgba(216,184,48,.12)', bd:'#BA9820', tc:'#D8C060'},
+    none: {label:'通常圏（満点超過なし）', bg:'var(--bg3)', bd:'var(--bd)', tc:'var(--t3)'},
+  }[depth.tier];
+  const partsTxt=depth.parts.length
+    ? depth.parts.map(p=>`${p.label} ${p.disp} <span style="color:#D8B830">+${p.pts}</span>`).join('　')
+    : 'なし';
+  const addSig = dh.newHigh
+    ? `<div style="margin-top:6px;font-size:11.5px;color:#5AC88A"><b>▲ 買い増しトリガ点灯</b>: 買いゾーン内で深度が直近${dh.nHist}回の最大(${dh.prevMax})を更新 → 分割での追加検討（初日一括は避ける・第2/第4分析）</div>`
+    : (depth.d>0&&dh.inBuy?`<div style="margin-top:6px;font-size:11px;color:var(--t3)">買い増しトリガ: 直近最大 ${dh.prevMax} を未更新</div>`:'');
+  document.getElementById('depthPanel').innerHTML=`
+    <div style="border:1px solid ${tierCfg.bd};background:${tierCfg.bg};border-radius:10px;padding:9px 12px;text-align:left">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px">
+        <span style="font-size:12px;color:var(--t2)">深度D（青天井の超過分・大底側）</span>
+        <span style="font-family:'Courier New',monospace;font-size:18px;color:${tierCfg.tc}"><b>${depth.d.toFixed(1)}</b></span>
+        <span style="font-size:11.5px;color:${tierCfg.tc}">${tierCfg.label}</span>
+      </div>
+      <div style="font-size:11px;color:var(--t2);margin-top:5px">超過の内訳: ${partsTxt}</div>
+      ${addSig}
+      <div style="font-size:10px;color:var(--t3);margin-top:5px">目安: D≧15=全面パニック型A級（コロナ実測≈23）／ B級調整はD 0〜2。深さは反発期待と同時にS級継続リスクも意味するため、Dが伸びている間は分割で追う（一括買いしない）。</div>
+    </div>`;
+  const bdRow=(label,b,t,o,strong)=>`<tr${strong?' style="background:var(--bg3)"':''}>
+    <td style="text-align:left;${strong?'font-weight:600':''}">${label}</td>
+    <td style="color:#1D9E75;font-family:'Courier New',monospace">${b==null?'—':b.toFixed(1)}</td>
+    <td style="color:#D85A30;font-family:'Courier New',monospace">${t==null?'—':t.toFixed(1)}</td>
+    <td style="font-family:'Courier New',monospace;${strong?'font-weight:700':''};color:${o==null?'var(--t3)':scoreColor(o)}">${o==null?'—':o.toFixed(1)}</td></tr>`;
+  document.getElementById('scoreBreakdown').innerHTML=`<table class="bd-t">
+    <thead><tr><th style="text-align:left">ブロック</th><th>大底スコア</th><th>天井スコア</th><th>総合(0=大底/100=天井)</th></tr></thead>
+    <tbody>
+      ${bdRow('テクニカル+需給 (L2×0.55 + L3×0.25 + L4×0.20)',IG.tqBottom,IG.tqTop,IG.tqOverall,false)}
+      ${bdRow('ファンダメンタル環境 (L5)',IG.fundBottom,IG.fundTop,IG.fundOverall,false)}
+      ${bdRow('全総合 (大底70:30 / 天井55:45で合算)',IG.allBottom,IG.allTop,IG.allOverall,true)}
+    </tbody></table>
+    ${IG.fundOk?'':'<p style="font-size:10.5px;color:var(--t3);margin-top:4px">※ ファンダ入力/取得なしのため、全総合=テク+需給総合として表示中</p>'}`;
+  const vd=verdictInfo(IG.allOverall);
   const vel=document.getElementById('verdict');
   vel.textContent=vd.t;
   Object.assign(vel.style,{color:vd.c,background:vd.bg,border:`.5px solid ${vd.bd}`});
@@ -2085,10 +2477,10 @@ function pad(s,n){return String(s).padEnd(n);}
 function padL(s,n){return String(s).padStart(n);}
 
 function generateReport(result){
-  const{layer1,layer2,layer3,layer4,layer5,info}=result;
+  const{layer1,layer2,layer3,layer4,layer5,fund,integration,info}=result;
   const{cur,prev,pch,n,symbol,name,ma50,ma200,market:mk}=info;
   const now=new Date().toLocaleString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
-  const vd=verdictInfo(layer5.score);
+  const vd=verdictInfo(integration.allOverall);
   const line='─'.repeat(60), dline='═'.repeat(60);
   function pad(s,n){return String(s).padEnd(n);}
 
@@ -2103,6 +2495,19 @@ function generateReport(result){
   t+='現在値   : '+cur.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})+' (前日比 '+fp2(pch,2)+'%)\n';
   t+=line+'\n';
 
+  t+='\n【スコア分離アーキテクチャ(v3)】\n';
+  const IG=integration;
+  t+='  テク+需給   : 大底 '+IG.tqBottom.toFixed(1)+' / 天井 '+IG.tqTop.toFixed(1)+' / 総合 '+IG.tqOverall.toFixed(1)+'\n';
+  t+='  ファンダ    : 大底 '+(IG.fundBottom==null?'—':IG.fundBottom.toFixed(1))+' / 天井 '+(IG.fundTop==null?'—':IG.fundTop.toFixed(1))+' / 総合 '+(IG.fundOverall==null?'—':IG.fundOverall.toFixed(1))+'\n';
+  t+='  全総合      : 大底 '+IG.allBottom.toFixed(1)+' / 天井 '+IG.allTop.toFixed(1)+' / 総合 '+IG.allOverall.toFixed(1)+' (合算比 底70:30/天井55:45)\n';
+  t+='  行動ゾーン  : 買い≦'+CONFIG.zones.buy+' / 利確≧'+CONFIG.zones.exit+' ｜ 初日は1/3打診の分割エントリー推奨\n';
+  const DP=result.depth;
+  if(DP){
+    const tierTxt=DP.tier==='panic'?'A級パニック域':DP.tier==='some'?'深度あり':'通常圏';
+    t+='  深度D(青天井): '+DP.d.toFixed(1)+' ('+tierTxt+')';
+    if(DP.parts.length) t+=' ｜ '+DP.parts.map(p=>p.label+'+'+p.pts).join(', ');
+    t+='\n';
+  }
   t+='\n【総合判定】Layer5 Overall Score\n';
   t+='  '+layer5.score.toFixed(1)+' / 100　→　'+vd.t+'\n';
   t+='  （0=大底 / 50=中立 / 100=天井）\n';
@@ -2184,67 +2589,123 @@ document.getElementById('btnCopy').addEventListener('click',()=>{
 /* ═══════════════════════════════════════════════
    MAIN
 ═══════════════════════════════════════════════ */
+/* ── ファンダ単独取得 ── */
+async function runFundOnly(){
+  document.getElementById('dLoad').style.display='';
+  try{
+    _fundAuto=null; _fundAutoAt=0; _fundJson=null; _fundJsonAt=0;
+    const fa=await fetchFundamentalAuto(true);
+    saveFundManual();
+    FundPersist.save(fa, getFundManual());
+    // 表示中結果があれば再採点
+    const sym=getCurSym(), key=cacheKeyFor(src,sym);
+    if(dataCache.has(key)){
+      const c=dataCache.get(key), data=clean(c.raw),
+            market=detectMarket(src==='yahoo'?sym.y:sym.a);
+      const result=analyse(data,c.sentiment,market,fa);
+      c.result=result; c.fundAuto=fa; _lastResult=result;
+      renderResult(result);
+    }
+  }catch(e){ document.getElementById('dErr').textContent='⚠ ファンダ: '+e.message;
+             document.getElementById('dErr').style.display=''; }
+  finally{ document.getElementById('dLoad').style.display='none'; }
+}
+
 async function run(force){
   ['dResult','dErr'].forEach(id=>document.getElementById(id).style.display='none');
-  const sym=getCurSym();
-  const key=cacheKeyFor(src,sym);
+  const sym=getCurSym(), key=cacheKeyFor(src,sym);
   const manualCode=document.getElementById('iSym').value.trim().toUpperCase();
   const wasManual=manualCode!=='';
 
-  // ── キャッシュヒット時は再フェッチせず即描画 ──
+  // ─ Step 1: メモリキャッシュ (同一セッション内) ─
   if(!force && dataCache.has(key)){
-    const cached=dataCache.get(key);
-    _lastResult=cached.result;
-    const dispSym=src==='yahoo'?sym.y:(sym.a||sym.y);
+    const cached=dataCache.get(key); _lastResult=cached.result;
+    const d=src==='yahoo'?sym.y:(sym.a||sym.y);
     document.getElementById('mainTitle').textContent=
-      (sym.name&&sym.name!==dispSym?sym.name+' ':'')+dispSym+' テクニカルスコア';
+      (sym.name&&sym.name!==d?sym.name+' ':'')+d+' テクニカルスコア';
     renderResult(cached.result);
     renderHistoryChart(cached.historical, histRangeDays);
     if(wasManual) saveSearchHistory(manualCode,src,cached.result.info?.name);
-    return;
+    updateFavBtn(); return;
   }
 
+  // ─ Step 2: localStorage永続キャッシュ (前回セッションの株価) ─
+  const pcI=PriceCache.info(src,sym);
+  if(!force && pcI && !pcI.stale){
+    const pc=PriceCache.load(src,sym);
+    if(pc?.closes?.length>=55){
+      document.getElementById('dLoad').style.display='';
+      try{
+        const market=detectMarket(src==='yahoo'?sym.y:sym.a);
+        const raw={closes:pc.closes,highs:pc.highs,lows:pc.lows,volumes:pc.volumes,
+                   meta:pc.meta||{symbol:sym.y||sym.a,name:sym.name||sym.y,
+                                  price:pc.closes[pc.closes.length-1],prev:pc.closes[pc.closes.length-2]}};
+        // ファンダは永続保持から(取得しない)
+        const fa=FundPersist.getAuto()||_fundAuto;
+        const sm=FundPersist.getManual(); if(sm) applyManualToDOM(sm);
+        saveFundManual();
+        const sentiment=await fetchSentiment(market).catch(()=>({market}));
+        const data=clean(raw);
+        const result=analyse(data,sentiment,market,fa);
+        const historical=computeHistoricalScores(data.closes,data.highs,data.lows,data.volumes,30);
+        dataCache.set(key,{raw,sentiment,market,fundAuto:fa,result,historical,fetchedAt:pc.at});
+        _lastResult=result;
+        const d=src==='yahoo'?sym.y:(sym.a||sym.y);
+        document.getElementById('mainTitle').textContent=
+          (sym.name&&sym.name!==d?sym.name+' ':'')+d+' テクニカルスコア';
+        renderResult(result); renderHistoryChart(historical,histRangeDays);
+        if(wasManual) saveSearchHistory(manualCode,src,result.info?.name);
+        updateFavBtn();
+        console.log('📦 永続キャッシュから復元:',pcI.days+'日分');
+      }catch(e){console.warn('キャッシュ復元失敗:',e.message); force=true;}
+      finally{document.getElementById('dLoad').style.display='none';}
+      if(!force) return;
+    }
+  }
+
+  // ─ Step 3: ネットワーク取得 (株価+センチメント。ファンダは24h以上古い場合のみ) ─
   document.getElementById('dLoad').style.display='';
-  ['btnFetch','btnReload'].forEach(id=>{const b=document.getElementById(id);if(b)b.disabled=true;});
+  ['btnFetch','btnReload','btnFundReload'].forEach(id=>{const b=document.getElementById(id);if(b)b.disabled=true;});
   try{
-    if(force&&src==='json') _pagesHistory=null; // 再取得時はJSONも再読込
     const market=detectMarket(src==='yahoo'?sym.y:sym.a);
-    // メインデータと感情指標を並列取得（JSONモードは history_1y.json から）
-    const [mainR, sentR] = await Promise.allSettled([
-      (src==='json'?fetchPages(sym.y)
-       :src==='yahoo'?fetchYahoo(sym.y)
-       :src==='av'?fetchAV(avKey,sym.a||sym.y)
-       :fetchFH(fhKey,sym.fh||sym.a||sym.y)),
+    const needFund=FundPersist.age()>CONFIG.priceCache.maxAge;
+    const fetches=[
+      (src==='yahoo'?fetchYahoo(sym.y):src==='av'?fetchAV(avKey,sym.a||sym.y):fetchFH(fhKey,sym.fh||sym.a||sym.y)),
       fetchSentiment(market),
-    ]);
-    if(mainR.status==='rejected') throw mainR.reason;
-    const raw=mainR.value;
-    const sentiment=sentR.status==='fulfilled'?sentR.value:{market};
-    // 感情指標の失敗を Pages JSON → 手動入力 の順で補完し、失敗通知バナーへ集約
-    hideQualityBanner();
-    const sentIssues=applySentimentFallbacks(sentiment, market);
-    if(sentIssues.length) showQualityBanner(sentIssues);
-    // ページタイトル更新
-    const dispSym=src==='yahoo'?sym.y:(sym.a||sym.y);
+    ];
+    if(needFund) fetches.push(fetchFundamentalAuto(true));
+    const rs=await Promise.allSettled(fetches);
+    if(rs[0].status==='rejected') throw rs[0].reason;
+    const raw=rs[0].value;
+    const sentiment=rs[1].status==='fulfilled'?rs[1].value:{market};
+    let fa;
+    if(needFund&&rs[2]?.status==='fulfilled'){
+      fa=rs[2].value; saveFundManual(); FundPersist.save(fa,getFundManual());
+    }else{
+      fa=FundPersist.getAuto()||_fundAuto;
+      const sm=FundPersist.getManual(); if(sm) applyManualToDOM(sm);
+      saveFundManual();
+    }
+    // 株価キャッシュをlocalStorageに永続保存
+    PriceCache.save(src,sym,raw);
+
+    const d2=src==='yahoo'?sym.y:(sym.a||sym.y);
     document.getElementById('mainTitle').textContent=
-      (sym.name&&sym.name!==dispSym?sym.name+' ':'')+dispSym+' テクニカルスコア';
+      (sym.name&&sym.name!==d2?sym.name+' ':'')+d2+' テクニカルスコア';
     const data=clean(raw);
-    const result=analyse(data,sentiment,market);
+    const result=analyse(data,sentiment,market,fa);
     const historical=computeHistoricalScores(data.closes,data.highs,data.lows,data.volumes,30);
-
-    // キャッシュ保存
-    dataCache.set(key,{raw,sentiment,market,result,historical,fetchedAt:Date.now()});
-
-    _lastResult=result;  // AI出力用に保持
-    renderResult(result);
-    renderHistoryChart(historical, histRangeDays);
+    dataCache.set(key,{raw,sentiment,market,fundAuto:fa,result,historical,fetchedAt:Date.now()});
+    _lastResult=result;
+    renderResult(result); renderHistoryChart(historical,histRangeDays);
     if(wasManual) saveSearchHistory(manualCode,src,result.info?.name);
+    updateFavBtn();
   }catch(e){
     const el=document.getElementById('dErr');
     el.textContent='⚠ '+e.message; el.style.display='';
   }finally{
     document.getElementById('dLoad').style.display='none';
-    ['btnFetch','btnReload'].forEach(id=>{const b=document.getElementById(id);if(b)b.disabled=false;});
+    ['btnFetch','btnReload','btnFundReload'].forEach(id=>{const b=document.getElementById(id);if(b)b.disabled=false;});
   }
 }
 
