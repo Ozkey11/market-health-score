@@ -1021,7 +1021,7 @@ async function fetchSentiment(market){
     vix: vixR.status==='fulfilled'?vixR.value:null,
     fg:  fgR.status==='fulfilled'?fgR.value:null,
     pcr: pcrR.status==='fulfilled'&&pcrR.value?pcrR.value:
-         (_fundJson?.indicators?.pcr?{ratio:_fundJson.indicators.pcr.value}:null),
+         (_fundJson?.indicators?.pcr?{ratio:_fundJson.indicators.pcr.value||_fundJson.indicators.pcr.ratio}:null),
     market,
   };
 }
@@ -1980,6 +1980,7 @@ function computeLayer4(sentiment,hiloProxy,market){
   const vixS=scoreVIX(sentiment.vix,market), vixOk=sentiment.vix?.price!=null;
   let pcrVal=sentiment.pcr;
   if(!pcrVal){const el=document.getElementById('fPCR');if(el&&el.value)pcrVal={ratio:parseFloat(el.value)};}
+  if(pcrVal&&!pcrVal.ratio&&pcrVal.value) pcrVal={ratio:pcrVal.value};
   const pcrS=scorePCR(pcrVal), pcrOk=!!pcrVal;
   const fgS=scoreFG(sentiment.fg), fgOk=!!sentiment.fg;
   const hiloS=scoreHILO(hiloProxy), hiloOk=hiloProxy!=null;

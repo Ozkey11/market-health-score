@@ -81,28 +81,36 @@ def _yahoo_z(symbol):
 
 
 def _fetch_pcr():
-    """Put/Call Ratio: CBOE公式のequitypc.csvから最新日のP/C Ratioを取得"""
-    urls = [
-        "https://cdn.cboe.com/resources/options/volume_and_call_put_ratios/equitypc.csv",
-        "https://cdn.cboe.com/resources/options/volume_and_call_put_ratios/totalpc.csv",
-    ]
-    for url in urls:
-        try:
-            csv = _get(url)
-            lines = csv.strip().split("\n")
-            # 最終行: DATE,CALL,PUT,TOTAL,P/C Ratio
-            for line in reversed(lines):
-                parts = line.split(",")
-                if len(parts) >= 5:
-                    val = float(parts[-1])
-                    if 0.1 < val < 5:
-                        date = parts[0].strip()
-                        label = "equity" if "equity" in url else "total"
-                        print(f"    PCR({label}): {val} ({date})")
-                        return {"value": round(val, 3), "date": date,
-                                "source": f"CBOE {label}pc.csv"}
-        except Exception as e:
-            print(f"  ✖ PCR ({url}): {e}")
+    """Put/Call Ratio: CBOE Daily Market Statisticsページから最新PCRをスクレイピング"""
+    # 方法1: CBOE Market Statisticsページ
+    try:
+        html = _get("https://www.cboe.com/us/options/market_statistics/daily/",
+                    {"Referer": "https://www.cboe.com/"})
+        # "EQUITY PUT/CALL RATIO" の近くの数値を探す
+        import re
+        m = re.search(r'(?:EQUITY|Equity)[^0-9]*?(?:PUT.?CALL|Put.?Call)[^0-9]*?(0\.\d{2,3})', html, re.I)
+        if m:
+            val = float(m.group(1))
+            if 0.2 < val < 3:
+                return {"value": round(val, 3), "source": "CBOE Daily Stats"}
+    except Exception as e:
+        print(f"  ✖ PCR (CBOE daily): {e}")
+    # 方法2: MacroMicro (最新値が検索で確認済み: 2026-06-30 = 0.64)
+    try:
+        html = _get("https://en.macromicro.me/series/1640/us-put-call-ratio")
+        import re
+        # ページ内の最新値を探す
+        m = re.search(r'"latest_value"[^0-9]*?(0\.\d{2,3})', html)
+        if not m:
+            m = re.search(r'(?:Latest|latest|最新)[^0-9]*?(0\.\d{2,3})', html)
+        if m:
+            val = float(m.group(1))
+            if 0.2 < val < 3:
+                return {"value": round(val, 3), "source": "MacroMicro CBOE PCR"}
+    except Exception as e:
+        print(f"  ✖ PCR (MacroMicro): {e}")
+    # 方法3: 旧CSVフォールバック(2019年で停止しているため最終手段)
+    # → 古すぎるため使用しない
     return None
 
 def run_fetch():
