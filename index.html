@@ -1914,23 +1914,23 @@ function computeFundamental(auto,manual){
 
   // 大底側の証拠（0〜1）— クレジット/パニック系のみ（第1レポート4章・第2レポート3章）
   const B=[
-    {k:'hy',     name:'HYスプレッド',        w:Wb.hy,     v:hy, s:hy==null?null:rampF(hy,5,10),        d:hy==null?'—':hy.toFixed(2)+'%',  src:{t:'FRED BAMLH0A0HYM2',u:'https://fred.stlouisfed.org/series/BAMLH0A0HYM2'}, i:'≧5%から加点、10%で満点(危機水準)'},
-    {k:'move',   name:'MOVE指数',            w:Wb.move,   v:mv, s:mv==null?null:rampF(mv,120,170),      d:mv==null?'取得不可':mv.toFixed(1), src:{t:'Yahoo ^MOVE (自動)',u:'https://finance.yahoo.com/quote/%5EMOVE/'}, i:'≧120から加点(債券パニック)'},
-    {k:'copperZ',name:'銅先物 Z(252d)',      w:Wb.copperZ,v:cz, s:cz==null?null:rampF(-cz,1,3),         d:cz==null?'取得不可':cz.toFixed(2)+'σ', src:{t:'Yahoo HG=F (自動)',u:'https://finance.yahoo.com/quote/HG%3DF/'}, i:'-1σから加点(景気総悲観)'},
-    {k:'wtiZ',   name:'WTI原油 Z(252d)',     w:Wb.wtiZ,   v:wz, s:wz==null?null:rampF(-wz,1,3),         d:wz==null?'取得不可':wz.toFixed(2)+'σ', src:{t:'Yahoo CL=F (自動)',u:'https://finance.yahoo.com/quote/CL%3DF/'}, i:'-1σから加点'},
-    {k:'dxyZ',   name:'ドル指数 Z(252d)',    w:Wb.dxyZ,   v:dz, s:dz==null?null:rampF(dz,1,2.5),        d:dz==null?'取得不可':dz.toFixed(2)+'σ', src:{t:'Yahoo DX-Y.NYB (自動)',u:'https://finance.yahoo.com/quote/DX-Y.NYB/'}, i:'+1σから加点(危機のドル逃避)'},
-    {k:'ismChg', name:'ISM改善転換',         w:Wb.ismChg, v:chg,s:(ism==null||chg==null)?null:(ism<50&&chg>0?rampF(chg,0,2):0), d:chg==null?'—':(ism<50&&chg>0?`${ism}へ+${chg.toFixed(1)}`:'条件外'), src:{t:'ISM PMI',u:'https://www.ismworld.org/supply-management-news-and-reports/reports/ism-report-on-business/'}, i:'ISM50未満からの改善で加点'},
-    {k:'perTtm', name:'PER(TTM)低位',        w:Wb.perTtm, v:per,s:per==null?null:rampF(16-per,0,4),     d:per==null?'—':per.toFixed(1)+'倍', src:{t:'multpl.com',u:'https://www.multpl.com/s-p-500-pe-ratio'}, i:'16倍以下から加点'},
+    {k:'hy',     name:'ハイイールド債スプレッド',        w:Wb.hy,     v:hy, s:hy==null?null:rampF(hy,5,10),        d:hy==null?'—':hy.toFixed(2)+'%',  src:{t:'FRED BAMLH0A0HYM2',u:'https://fred.stlouisfed.org/series/BAMLH0A0HYM2'}, i:'社債の信用不安度。5%超で警戒、10%超はリーマン級'},
+    {k:'move',   name:'MOVE指数(債券ボラ)',            w:Wb.move,   v:mv, s:mv==null?null:rampF(mv,120,170),      d:mv==null?'取得不可':mv.toFixed(1), src:{t:'Yahoo ^MOVE (自動)',u:'https://finance.yahoo.com/quote/%5EMOVE/'}, i:'債券市場の恐怖指数。120超で不安、170超は全面パニック'},
+    {k:'copperZ',name:'銅先物(1年偏差値)',      w:Wb.copperZ,v:cz, s:cz==null?null:rampF(-cz,1,3),         d:cz==null?'取得不可':cz.toFixed(2)+'σ', src:{t:'Yahoo HG=F (自動)',u:'https://finance.yahoo.com/quote/HG%3DF/'}, i:'銅が1年平均より大幅下落=世界景気の悲観'},
+    {k:'wtiZ',   name:'原油WTI(1年偏差値)',     w:Wb.wtiZ,   v:wz, s:wz==null?null:rampF(-wz,1,3),         d:wz==null?'取得不可':wz.toFixed(2)+'σ', src:{t:'Yahoo CL=F (自動)',u:'https://finance.yahoo.com/quote/CL%3DF/'}, i:'原油が1年平均より大幅下落=需要減退'},
+    {k:'dxyZ',   name:'米ドル指数(1年偏差値)',    w:Wb.dxyZ,   v:dz, s:dz==null?null:rampF(dz,1,2.5),        d:dz==null?'取得不可':dz.toFixed(2)+'σ', src:{t:'Yahoo DX-Y.NYB (自動)',u:'https://finance.yahoo.com/quote/DX-Y.NYB/'}, i:'ドルが1年平均より大幅上昇=安全資産への逃避'},
+    {k:'ismChg', name:'ISM製造業 底打ち反転',         w:Wb.ismChg, v:chg,s:(ism==null||chg==null)?null:(ism<50&&chg>0?rampF(chg,0,2):0), d:chg==null?'—':(ism<50&&chg>0?`${ism}へ+${chg.toFixed(1)}`:'条件外'), src:{t:'ISM PMI',u:'https://www.ismworld.org/supply-management-news-and-reports/reports/ism-report-on-business/'}, i:'製造業が不況圏(50未満)から回復=底打ちサイン'},
+    {k:'perTtm', name:'S&P500 PER 割安',        w:Wb.perTtm, v:per,s:per==null?null:rampF(16-per,0,4),     d:per==null?'—':per.toFixed(1)+'倍', src:{t:'multpl.com',u:'https://www.multpl.com/s-p-500-pe-ratio'}, i:'株価収益率が割安水準(16倍以下)に低下'},
   ];
   // 天井側の証拠 — バリュエーション+金利構造+自己満足(complacency)
   const T=[
-    {k:'shiller',name:'シラーPER',           w:Wt.shiller,v:sh, s:sh==null?null:rampF(sh,30,40),        d:sh==null?'—':sh.toFixed(1)+'倍', src:{t:'multpl.com',u:'https://www.multpl.com/shiller-pe'}, i:'30倍から加点(SPY天井の75%で成立)'},
-    {k:'perTtm', name:'PER(TTM)高位',        w:Wt.perTtm, v:per,s:per==null?null:rampF(per,22,28),      d:per==null?'—':per.toFixed(1)+'倍', src:{t:'multpl.com',u:'https://www.multpl.com/s-p-500-pe-ratio'}, i:'22倍から加点'},
-    {k:'ycurve', name:'逆イールド(10y-2y)',  w:Wt.ycurve, v:yc, s:yc==null?null:rampF(-yc,0,0.75),      d:yc==null?'—':(yc>=0?'+':'')+yc.toFixed(2)+'%', src:{t:'FRED T10Y2Y',u:'https://fred.stlouisfed.org/series/T10Y2Y'}, i:'逆転(<0)から加点(S級暴落前は100%先行)'},
-    {k:'hyLow',  name:'HY自己満足',          w:Wt.hyLow,  v:hy, s:hy==null?null:rampF(3.5-hy,0,1.2),    d:hy==null?'—':hy.toFixed(2)+'%',  src:{t:'FRED BAMLH0A0HYM2',u:'https://fred.stlouisfed.org/series/BAMLH0A0HYM2'}, i:'3.5%以下から加点(クレジット凪)'},
-    {k:'moveLow',name:'MOVE低位',            w:Wt.moveLow,v:mv, s:mv==null?null:rampF(80-mv,0,25),      d:mv==null?'取得不可':mv.toFixed(1), src:{t:'Yahoo ^MOVE (自動)',u:'https://finance.yahoo.com/quote/%5EMOVE/'}, i:'80以下から加点(債券市場の油断)'},
-    {k:'ismChg', name:'ISM高位からの低下',   w:Wt.ismChg, v:chg,s:(ism==null||chg==null)?null:(ism>55&&chg<0?rampF(-chg,0,2):0), d:chg==null?'—':(ism>55&&chg<0?`${ism}へ${chg.toFixed(1)}`:'条件外'), src:{t:'ISM PMI',u:'https://www.ismworld.org/supply-management-news-and-reports/reports/ism-report-on-business/'}, i:'ISM55超からの低下で加点'},
-    {k:'copperZ',name:'銅の過熱',            w:Wt.copperZ,v:cz, s:cz==null?null:rampF(cz,1.5,3),        d:cz==null?'取得不可':cz.toFixed(2)+'σ', src:{t:'Yahoo HG=F (自動)',u:'https://finance.yahoo.com/quote/HG%3DF/'}, i:'+1.5σから加点'},
+    {k:'shiller',name:'シラーPER(長期割高度)',           w:Wt.shiller,v:sh, s:sh==null?null:rampF(sh,30,40),        d:sh==null?'—':sh.toFixed(1)+'倍', src:{t:'multpl.com',u:'https://www.multpl.com/shiller-pe'}, i:'歴史的に割高。過去の天井の75%でこの水準以上'},
+    {k:'perTtm', name:'S&P500 PER 割高',        w:Wt.perTtm, v:per,s:per==null?null:rampF(per,22,28),      d:per==null?'—':per.toFixed(1)+'倍', src:{t:'multpl.com',u:'https://www.multpl.com/s-p-500-pe-ratio'}, i:'株価収益率が高め(22倍超)で過熱気味'},
+    {k:'ycurve', name:'逆イールド(長短金利差)',  w:Wt.ycurve, v:yc, s:yc==null?null:rampF(-yc,0,0.75),      d:yc==null?'—':(yc>=0?'+':'')+yc.toFixed(2)+'%', src:{t:'FRED T10Y2Y',u:'https://fred.stlouisfed.org/series/T10Y2Y'}, i:'逆転(<0)から加点(S級暴落前は100%先行)'},
+    {k:'hyLow',  name:'HYスプレッド 楽観(低すぎ)',          w:Wt.hyLow,  v:hy, s:hy==null?null:rampF(3.5-hy,0,1.2),    d:hy==null?'—':hy.toFixed(2)+'%',  src:{t:'FRED BAMLH0A0HYM2',u:'https://fred.stlouisfed.org/series/BAMLH0A0HYM2'}, i:'スプレッドが低すぎ=市場がリスクを軽視'},
+    {k:'moveLow',name:'MOVE指数 油断(低すぎ)',            w:Wt.moveLow,v:mv, s:mv==null?null:rampF(80-mv,0,25),      d:mv==null?'取得不可':mv.toFixed(1), src:{t:'Yahoo ^MOVE (自動)',u:'https://finance.yahoo.com/quote/%5EMOVE/'}, i:'債券ボラが低すぎ=リスクを忘れている状態'},
+    {k:'ismChg', name:'ISM製造業 ピークアウト',   w:Wt.ismChg, v:chg,s:(ism==null||chg==null)?null:(ism>55&&chg<0?rampF(-chg,0,2):0), d:chg==null?'—':(ism>55&&chg<0?`${ism}へ${chg.toFixed(1)}`:'条件外'), src:{t:'ISM PMI',u:'https://www.ismworld.org/supply-management-news-and-reports/reports/ism-report-on-business/'}, i:'製造業が好況ピーク(55超)から低下=景気減速の兆し'},
+    {k:'copperZ',name:'銅先物 過熱(1年偏差値)',            w:Wt.copperZ,v:cz, s:cz==null?null:rampF(cz,1.5,3),        d:cz==null?'取得不可':cz.toFixed(2)+'σ', src:{t:'Yahoo HG=F (自動)',u:'https://finance.yahoo.com/quote/HG%3DF/'}, i:'銅が1年平均より大幅上昇=景気楽観の行き過ぎ'},
   ];
   function agg(items){
     const av=items.filter(it=>it.s!=null);
