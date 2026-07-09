@@ -81,28 +81,28 @@ def _yahoo_z(symbol):
 
 
 def _fetch_pcr():
-    """Put/Call Ratio: yfinanceで^CPCEを取得(CBOE直接は403で封鎖済み)"""
-    try:
-        import yfinance as yf
-        tk = yf.Ticker("^CPCE")
-        df = tk.history(period="5d")
-        if df.empty: 
-            # フォールバック: Barchart等のスクレイピング
-            try:
-                html = _get("https://www.barchart.com/options/put-call-ratio",
-                            {"Referer": "https://www.barchart.com/"})
-                import re
-                m = re.search(r'Equity[^0-9]*?(0\.\d{2,3})', html)
-                if m:
-                    return {"value": float(m.group(1)), "source": "barchart.com"}
-            except: pass
-            return None
-        last = float(df["Close"].dropna().iloc[-1])
-        if 0.1 < last < 5:
-            return {"value": round(last, 3), "source": "Yahoo ^CPCE"}
-        return None
-    except Exception as e:
-        print(f"  ✖ PCR: {e}")
+    """Put/Call Ratio: CBOE公式のequitypc.csvから最新日のP/C Ratioを取得"""
+    urls = [
+        "https://cdn.cboe.com/resources/options/volume_and_call_put_ratios/equitypc.csv",
+        "https://cdn.cboe.com/resources/options/volume_and_call_put_ratios/totalpc.csv",
+    ]
+    for url in urls:
+        try:
+            csv = _get(url)
+            lines = csv.strip().split("\n")
+            # 最終行: DATE,CALL,PUT,TOTAL,P/C Ratio
+            for line in reversed(lines):
+                parts = line.split(",")
+                if len(parts) >= 5:
+                    val = float(parts[-1])
+                    if 0.1 < val < 5:
+                        date = parts[0].strip()
+                        label = "equity" if "equity" in url else "total"
+                        print(f"    PCR({label}): {val} ({date})")
+                        return {"value": round(val, 3), "date": date,
+                                "source": f"CBOE {label}pc.csv"}
+        except Exception as e:
+            print(f"  ✖ PCR ({url}): {e}")
     return None
 
 def run_fetch():
