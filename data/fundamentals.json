@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-07-09T14:01:35.172175+00:00",
+  "updated_at": "2026-07-09T14:11:54.768161+00:00",
   "indicators": {
     "hy_spread": {
       "value": 2.67,
@@ -25,18 +25,18 @@
       "source": "Yahoo ^MOVE"
     },
     "wti": {
-      "value": 72.86,
-      "z": 0.038,
+      "value": 72.59,
+      "z": 0.021,
       "source": "Yahoo CL=F"
     },
     "copper": {
-      "value": 6.2655,
-      "z": 1.254,
+      "value": 6.272,
+      "z": 1.265,
       "source": "Yahoo HG=F"
     },
     "dxy": {
-      "value": 100.905,
-      "z": 2.078,
+      "value": 100.867,
+      "z": 2.042,
       "source": "Yahoo DX-Y.NYB"
     },
     "pcr": {
