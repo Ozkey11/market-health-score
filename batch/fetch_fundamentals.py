@@ -162,7 +162,7 @@ def run_fetch():
         time.sleep(0.3)
 
     # Put/Call Ratio
-    print("  PCR (Yahoo ^CPCE)...")
+    print("  PCR (CBOE/MacroMicro)...")
     r = _fetch_pcr()
     if r:
         ind["pcr"] = r; print(f"    → {r['value']}")

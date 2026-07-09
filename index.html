@@ -1986,8 +1986,8 @@ function computeLayer4(sentiment,hiloProxy,market){
   const hiloS=scoreHILO(hiloProxy), hiloOk=hiloProxy!=null;
   const items=[
     {name:'VIX'+(market==='JP'?'(^JNIV)':'(^VIX)'), maxW:8, s:vixS, ok:vixOk, disp:vixOk?sentiment.vix.price.toFixed(1):'取得不可', i:iVIX(sentiment.vix,market)},
-    {name:'Put/Call Ratio', maxW:6, s:pcrS, ok:pcrOk, disp:pcrOk?sentiment.pcr.ratio.toFixed(2):
-        (document.getElementById('fPCR')?.value?document.getElementById('fPCR').value+'(手入力)':'取得不可'), i:iPCR(sentiment.pcr)},
+    {name:'Put/Call Ratio', maxW:6, s:pcrS, ok:pcrOk, disp:pcrOk?pcrVal.ratio.toFixed(2):
+        (document.getElementById('fPCR')?.value?document.getElementById('fPCR').value+'(手入力)':'取得不可(米国のみ)'), i:iPCR(pcrVal)},
     {name:'Fear & Greed',   maxW:4, s:fgS,  ok:fgOk,  disp:fgOk?sentiment.fg.score.toFixed(0):'取得不可(米国のみ)', i:iFG(sentiment.fg)},
     {name:'新高値新安値比率(proxy)', maxW:4, s:hiloS, ok:hiloOk, disp:hiloOk?(hiloProxy*100).toFixed(0)+'%':'—', i:iHILO(hiloProxy)},
   ];
@@ -2646,6 +2646,9 @@ async function run(force){
         const sm=FundPersist.getManual(); if(sm) applyManualToDOM(sm);
         saveFundManual();
         const sentiment=await fetchSentiment(market).catch(()=>({market}));
+        if(!sentiment.pcr && _fundJson?.indicators?.pcr){
+          sentiment.pcr={ratio: _fundJson.indicators.pcr.value};
+        }
         const data=clean(raw);
         const result=analyse(data,sentiment,market,fa);
         const historical=computeHistoricalScores(data.closes,data.highs,data.lows,data.volumes,30);
@@ -2679,6 +2682,10 @@ async function run(force){
     if(rs[0].status==='rejected') throw rs[0].reason;
     const raw=rs[0].value;
     const sentiment=rs[1].status==='fulfilled'?rs[1].value:{market};
+    // PCRパッチ: sentimentにPCRがなければJSONから注入
+    if(!sentiment.pcr && _fundJson?.indicators?.pcr){
+      sentiment.pcr={ratio: _fundJson.indicators.pcr.value};
+    }
     let fa;
     if(needFund&&rs[2]?.status==='fulfilled'){
       fa=rs[2].value; saveFundManual(); FundPersist.save(fa,getFundManual());
