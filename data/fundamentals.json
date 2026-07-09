@@ -1,9 +1,5 @@
 {
-<<<<<<< Updated upstream
-  "updated_at": "2026-07-09T10:38:49.056784+00:00",
-=======
-  "updated_at": "2026-07-09T10:39:19.119709+00:00",
->>>>>>> Stashed changes
+  "updated_at": "2026-07-09T13:45:05.758331+00:00",
   "indicators": {
     "hy_spread": {
       "value": 2.67,
@@ -29,33 +25,18 @@
       "source": "Yahoo ^MOVE"
     },
     "wti": {
-<<<<<<< Updated upstream
-      "value": 73.77,
-      "z": 0.096,
+      "value": 72.98,
+      "z": 0.046,
       "source": "Yahoo CL=F"
     },
     "copper": {
-      "value": 6.2185,
-      "z": 1.178,
+      "value": 6.24,
+      "z": 1.213,
       "source": "Yahoo HG=F"
     },
     "dxy": {
-      "value": 100.986,
-      "z": 2.154,
-=======
-      "value": 73.78,
-      "z": 0.097,
-      "source": "Yahoo CL=F"
-    },
-    "copper": {
-      "value": 6.2175,
-      "z": 1.177,
-      "source": "Yahoo HG=F"
-    },
-    "dxy": {
-      "value": 100.983,
-      "z": 2.151,
->>>>>>> Stashed changes
+      "value": 100.941,
+      "z": 2.112,
       "source": "Yahoo DX-Y.NYB"
     }
   }
