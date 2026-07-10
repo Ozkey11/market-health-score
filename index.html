@@ -3,7 +3,13 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>株価スコア v3.4 — キャッシュ+取得分離+お気に入り</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#534AB7">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="icon-192.png">
+<script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"><\/script>
+<title>Market Health Score v4</title>
 <style>
 :root{
   --bg:#07090f;--bg2:#0c1020;--bg3:#111828;
@@ -99,9 +105,29 @@ button:disabled{opacity:.4;cursor:default}
   border:.5px solid var(--bd2);border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;
   transition:background .2s,color .2s;box-shadow:0 2px 8px rgba(0,0,0,.15)}
 .theme-btn:hover{background:var(--bg2);color:var(--t1)}
+.main-tabs{display:flex;gap:0;margin:0 0 16px;border-bottom:2px solid var(--bd)}
+.main-tab{flex:1;padding:10px;text-align:center;font-size:13px;color:var(--t2);background:transparent;
+  border:none;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s}
+.main-tab.active{color:var(--t1);border-bottom-color:var(--acc);font-weight:600}
+.main-tab:hover{color:var(--t1)}
+.tab-page{display:none}.tab-page.active{display:block}
+.fav-row{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:.5px solid var(--bd);cursor:pointer;transition:background .15s}
+.fav-row:hover{background:var(--bg3)}
+.fav-row .score-badge{min-width:42px;text-align:center;padding:3px 8px;border-radius:6px;font-size:13px;font-weight:600;font-family:var(--mono)}
+.fav-controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+.fav-controls select,.fav-controls input{background:var(--bg3);color:var(--t1);border:.5px solid var(--bd2);border-radius:6px;padding:5px 8px;font-size:12px}
+.fav-pager{display:flex;gap:6px;justify-content:center;margin:12px 0}
+.fav-pager button{padding:5px 12px;background:var(--bg3);color:var(--t1);border:.5px solid var(--bd2);border-radius:6px;font-size:12px;cursor:pointer}
+.fav-pager button.active{background:var(--acc);color:white}
+.candle-wrap{width:100%;height:340px;border-radius:8px;overflow:hidden;margin:8px 0}
 </style>
 </head>
 <body>
+<div class="tab-page active" id="page-score">
+<div class="main-tabs" id="mainTabs">
+  <button class="main-tab active" data-tab="score">📊 スコア分析</button>
+  <button class="main-tab" data-tab="favlist">★ お気に入りリスト</button>
+</div>
 <button class="theme-btn" id="themeToggle" title="テーマ切替" onclick="toggleTheme()">☀️ ライト</button>
 <div class="wrap">
 
@@ -325,7 +351,7 @@ button:disabled{opacity:.4;cursor:default}
 
   <!-- Score History -->
   <p class="sec" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-    <span>スコア推移（Layer2+3のみ・感情指標含まず）</span>
+    <span>スコア推移（L2+L3）+ VIX/日経VI</span>
     <span style="display:flex;gap:4px">
       <button class="chip on" id="hist1w" style="padding:3px 12px;font-size:11px">1週間</button>
       <button class="chip" id="hist1m" style="padding:3px 12px;font-size:11px">1ヶ月</button>
@@ -363,7 +389,49 @@ button:disabled{opacity:.4;cursor:default}
 
 </div><!-- /wrap -->
 
+</div><!-- /page-score -->
+<!-- ═══ お気に入りリストページ ═══ -->
+<div class="tab-page" id="page-favlist">
+  <div class="panel" style="padding:16px">
+    <div class="fav-controls">
+      <select id="favSort"><option value="name">名前順</option><option value="score">スコア順</option><option value="change">前日比順</option><option value="added">登録順</option></select>
+      <select id="favFilter"><option value="all">すべて</option><option value="buy">買いゾーン(≦25)</option><option value="sell">利確ゾーン(≧70)</option><option value="us">米国</option><option value="jp">日本</option></select>
+      <input type="text" id="favSearch" placeholder="🔍 銘柄検索..." style="flex:1;min-width:120px">
+      <button id="favScanAll" class="btn-p" style="font-size:12px;padding:6px 14px">🔄 一括スキャン</button>
+      <span id="favScanStatus" style="font-size:11px;color:var(--t2)"></span>
+    </div>
+    <div id="favListBody"></div>
+    <div class="fav-pager" id="favPager"></div>
+  </div>
+</div>
+
+<!-- ═══ ローソク足チャート (スコアページ内、スコア推移の下に) ═══ -->
+
 <script>
+
+/* ═══ Service Worker登録 (PWA) ═══ */
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+
+/* ═══ IndexedDB ラッパー ═══ */
+var IDB={
+  _db:null, _name:'mh_score_db', _ver:1, _store:'kv',
+  async open(){
+    if(this._db) return this._db;
+    return new Promise((res,rej)=>{
+      const r=indexedDB.open(this._name,this._ver);
+      r.onupgradeneeded=e=>{const db=e.target.result;if(!db.objectStoreNames.contains(this._store))db.createObjectStore(this._store);};
+      r.onsuccess=e=>{this._db=e.target.result;res(this._db);};
+      r.onerror=e=>rej(e.target.error);
+    });
+  },
+  async get(k){const db=await this.open();return new Promise((res,rej)=>{const r=db.transaction(this._store,'readonly').objectStore(this._store).get(k);r.onsuccess=()=>res(r.result===undefined?null:r.result);r.onerror=e=>rej(e.target.error);});},
+  async set(k,v){const db=await this.open();return new Promise((res,rej)=>{const tx=db.transaction(this._store,'readwrite');tx.objectStore(this._store).put(v,k);tx.oncomplete=()=>res();tx.onerror=e=>rej(e.target.error);});},
+  async del(k){const db=await this.open();return new Promise((res,rej)=>{const tx=db.transaction(this._store,'readwrite');tx.objectStore(this._store).delete(k);tx.oncomplete=()=>res();tx.onerror=e=>rej(e.target.error);});},
+  async keys(pfx){const db=await this.open();return new Promise((res,rej)=>{const r=db.transaction(this._store,'readonly').objectStore(this._store).getAllKeys();r.onsuccess=()=>{const a=r.result||[];res(pfx?a.filter(k=>typeof k==='string'&&k.startsWith(pfx)):a);};r.onerror=e=>rej(e.target.error);});},
+};
+
 
 /* テーマ切替(v3.2) — onclick属性で確実に動作 */
 function toggleTheme(){
@@ -412,20 +480,21 @@ let activePst=PRESETS[0];
 /* ═══ 株価キャッシュ (localStorage永続) ═══ */
 var PriceCache={
   _k(s,sym){return CONFIG.priceCache.key+'|'+s+'|'+(sym.y||sym.a||'');},
-  load(s,sym){try{return JSON.parse(localStorage.getItem(this._k(s,sym)));}catch(e){return null;}},
-  save(s,sym,raw){
+  async load(s,sym){try{return await IDB.get(this._k(s,sym));}catch(e){return null;}},
+  async save(s,sym,raw){
     try{
       const max=CONFIG.priceCache.maxDays;
       const d={closes:raw.closes?.slice(-max),highs:raw.highs?.slice(-max),
                lows:raw.lows?.slice(-max),volumes:raw.volumes?.slice(-max),
+               dates:raw.dates?.slice(-max),
                meta:raw.meta, at:Date.now()};
-      localStorage.setItem(this._k(s,sym),JSON.stringify(d));
+      await IDB.set(this._k(s,sym),d);
     }catch(e){console.warn('キャッシュ保存失敗:',e);}
   },
-  info(s,sym){
-    const d=this.load(s,sym);
+  async info(s,sym){
+    const d=await this.load(s,sym);
     if(!d?.closes?.length) return null;
-    return{days:d.closes.length, at:d.at, stale:Date.now()-(d.at||0)>CONFIG.priceCache.maxAge};
+    return{days:d.closes.length, at:d.at, stale:false};
   },
 };
 
@@ -445,16 +514,27 @@ function applyManualToDOM(obj){
 
 /* ═══ お気に入り管理 ═══ */
 var Favorites={
-  _l(){try{return JSON.parse(localStorage.getItem(CONFIG.favKey)||'[]');}catch(e){return[];}},
-  _s(a){try{localStorage.setItem(CONFIG.favKey,JSON.stringify(a));}catch(e){}},
-  list(){return this._l();},
-  has(c,s){return this._l().some(f=>f.c===c&&f.s===s);},
-  toggle(c,s,n){let a=this._l();const i=a.findIndex(f=>f.c===c&&f.s===s);
-    if(i>=0)a.splice(i,1);else{a.unshift({c,s,n:n||c});if(a.length>20)a.pop();}
-    this._s(a);return i<0;},
+  _cache:null,
+  async _l(){
+    if(this._cache) return this._cache;
+    try{const v=await IDB.get('favorites'); this._cache=v||[]; return this._cache;}
+    catch(e){return[];}
+  },
+  async _s(a){this._cache=a; try{await IDB.set('favorites',a);}catch(e){}},
+  async list(){return await this._l();},
+  async has(c,s){return (await this._l()).some(f=>f.c===c&&f.s===s);},
+  async toggle(c,s,n){
+    let a=await this._l();const i=a.findIndex(f=>f.c===c&&f.s===s);
+    if(i>=0)a.splice(i,1);else{a.unshift({c,s,n:n||c,market:detectMarket(c),addedAt:Date.now()});if(a.length>1000)a.pop();}
+    await this._s(a);return i<0;
+  },
+  async updateScore(c,s,score,price,change){
+    let a=await this._l();const f=a.find(f=>f.c===c&&f.s===s);
+    if(f){f.score=score;f.price=price;f.change=change;f.scoredAt=Date.now();await this._s(a);}
+  },
 };
-function renderFavorites(){
-  const arr=Favorites.list(), box=document.getElementById('favChips'),
+async function renderFavorites(){
+  const arr=await Favorites.list(), box=document.getElementById('favChips'),
         bar=document.getElementById('favBar');
   if(!arr.length){bar.style.display='none';return;}
   bar.style.display='';
@@ -470,10 +550,10 @@ function renderFavorites(){
     });
   });
 }
-function updateFavBtn(){
+async function updateFavBtn(){
   const sym=getCurSym(),c=src==='yahoo'?sym.y:(sym.a||sym.y);
   const b=document.getElementById('btnFav');
-  const on=Favorites.has(c,src); b.textContent=on?'★':'☆'; b.style.color=on?'#D8B830':'var(--t3)';
+  const on=await Favorites.has(c,src); b.textContent=on?'★':'☆'; b.style.color=on?'#D8B830':'var(--t3)';
 }
 
 // ── データキャッシュ（メモリ, セッション中のみ）──
@@ -615,6 +695,155 @@ function saveSearchHistory(code,srcVal,name){
   try{ localStorage.setItem('sp500_history',JSON.stringify(searchHistory)); }catch(e){}
   renderHistoryChips();
 renderFavorites();
+
+
+/* ═══ メインタブ切替 ═══ */
+document.querySelectorAll('.main-tab').forEach(tab=>{
+  tab.addEventListener('click',()=>{
+    document.querySelectorAll('.main-tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    document.querySelectorAll('.tab-page').forEach(p=>p.classList.remove('active'));
+    const pg=document.getElementById('page-'+tab.dataset.tab);
+    if(pg) pg.classList.add('active');
+    if(tab.dataset.tab==='favlist') renderFavList();
+  });
+});
+
+/* ═══ お気に入りリスト (1000件・ページネーション・ソート・フィルタ・一括スキャン) ═══ */
+const FAV_PER_PAGE=100;
+let favPage=0, favScanning=false;
+
+function scoreColor(s){
+  if(s==null) return 'var(--t3)';
+  if(s<=25) return '#1D9E75';
+  if(s>=70) return '#D85A30';
+  if(s>=55) return '#BA7517';
+  return 'var(--t1)';
+}
+
+async function renderFavList(){
+  let arr=await Favorites.list();
+  const sortV=document.getElementById('favSort')?.value||'added';
+  const filterV=document.getElementById('favFilter')?.value||'all';
+  const searchV=(document.getElementById('favSearch')?.value||'').toUpperCase();
+  // フィルタ
+  if(filterV==='buy') arr=arr.filter(f=>f.score!=null&&f.score<=25);
+  else if(filterV==='sell') arr=arr.filter(f=>f.score!=null&&f.score>=70);
+  else if(filterV==='us') arr=arr.filter(f=>!f.c?.includes('.T')&&f.c!=='^N225');
+  else if(filterV==='jp') arr=arr.filter(f=>f.c?.includes('.T')||f.c==='^N225');
+  if(searchV) arr=arr.filter(f=>(f.c||'').includes(searchV)||(f.n||'').toUpperCase().includes(searchV));
+  // ソート
+  if(sortV==='name') arr.sort((a,b)=>(a.c||'').localeCompare(b.c||''));
+  else if(sortV==='score') arr.sort((a,b)=>(a.score??999)-(b.score??999));
+  else if(sortV==='change') arr.sort((a,b)=>(b.change??0)-(a.change??0));
+  // ページネーション
+  const totalPages=Math.max(1,Math.ceil(arr.length/FAV_PER_PAGE));
+  if(favPage>=totalPages) favPage=totalPages-1;
+  const start=favPage*FAV_PER_PAGE, end=start+FAV_PER_PAGE;
+  const page=arr.slice(start,end);
+  // 描画
+  const body=document.getElementById('favListBody');
+  if(!page.length){body.innerHTML='<p style="color:var(--t3);text-align:center;padding:40px">お気に入りが登録されていません。スコア分析画面で ☆ をタップして追加してください。</p>';
+    document.getElementById('favPager').innerHTML='';return;}
+  body.innerHTML=page.map((f,i)=>{
+    const sc=f.score!=null?f.score.toFixed(1):'—';
+    const pr=f.price!=null?f.price.toLocaleString(undefined,{maximumFractionDigits:2}):'—';
+    const ch=f.change!=null?(f.change>=0?'+':'')+f.change.toFixed(2)+'%':'—';
+    const chColor=f.change>0?'#1D9E75':f.change<0?'#D85A30':'var(--t2)';
+    const age=f.scoredAt?Math.round((Date.now()-f.scoredAt)/60000)+'分前':'未取得';
+    return `<div class="fav-row" data-fi="${start+i}">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;color:var(--t1);font-weight:500">${f.c} <span style="font-size:11px;color:var(--t2)">${f.n||''}</span></div>
+        <div style="font-size:11px;color:var(--t3)">${age}</div>
+      </div>
+      <div style="text-align:right;min-width:80px">
+        <div style="font-size:13px;color:var(--t1);font-family:var(--mono)">${pr}</div>
+        <div style="font-size:11.5px;color:${chColor};font-family:var(--mono)">${ch}</div>
+      </div>
+      <div class="score-badge" style="background:${f.score!=null?scoreColor(f.score)+'22':'var(--bg3)'};color:${scoreColor(f.score)}">${sc}</div>
+      <button class="fav-scan-btn" data-fc="${f.c}" data-fs="${f.s}" style="padding:4px 8px;font-size:11px;background:var(--bg3);color:var(--t2);border:.5px solid var(--bd2);border-radius:5px;cursor:pointer" title="この銘柄のスコアを更新">↻</button>
+    </div>`;
+  }).join('');
+  // ページャー
+  const pager=document.getElementById('favPager');
+  if(totalPages<=1){pager.innerHTML='';} else {
+    let ph='';
+    for(let p=0;p<totalPages;p++) ph+=`<button class="${p===favPage?'active':''}" data-fp="${p}">${p+1}</button>`;
+    pager.innerHTML=ph;
+    pager.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{favPage=+b.dataset.fp;renderFavList();}));
+  }
+  // イベント: 行タップ→詳細、更新ボタン
+  body.querySelectorAll('.fav-row').forEach(row=>{
+    row.addEventListener('click',(e)=>{
+      if(e.target.closest('.fav-scan-btn')) return;
+      const allFavs=Favorites._cache||[];
+      const f=allFavs[+row.dataset.fi]; if(!f) return;
+      src=f.s||'yahoo';
+      document.querySelectorAll('.tab[data-s]').forEach(t=>t.classList.toggle('on',t.dataset.s===src));
+      document.getElementById('iSym').value=f.c;
+      activePst=null;
+      document.querySelectorAll('.main-tab').forEach(t=>t.classList.remove('active'));
+      document.querySelector('.main-tab[data-tab="score"]').classList.add('active');
+      document.querySelectorAll('.tab-page').forEach(p=>p.classList.remove('active'));
+      document.getElementById('page-score').classList.add('active');
+      run(false);
+    });
+  });
+  body.querySelectorAll('.fav-scan-btn').forEach(btn=>{
+    btn.addEventListener('click',async(e)=>{
+      e.stopPropagation();
+      btn.disabled=true; btn.textContent='...';
+      try{await scanOneFav(btn.dataset.fc,btn.dataset.fs);}catch(e){}
+      btn.disabled=false; btn.textContent='↻';
+    });
+  });
+}
+// 単一銘柄スキャン
+async function scanOneFav(code,srcVal){
+  const oldSrc=src; src=srcVal||'yahoo';
+  try{
+    const sym=resolveSym(code);
+    const market=detectMarket(code);
+    const raw=await fetchYahoo(sym.y||code);
+    const sentiment=await fetchSentiment(market).catch(()=>({market}));
+    const fa=FundPersist.getAuto()||_fundAuto;
+    const sm=FundPersist.getManual(); if(sm) applyManualToDOM(sm);
+    saveFundManual();
+    const data=clean(raw);
+    const result=analyse(data,sentiment,market,fa);
+    const price=result.info?.cur;
+    const change=result.info?.pch;
+    const score=result.integration?.allOverall;
+    await Favorites.updateScore(code,srcVal,score!=null?Math.round(score*10)/10:null,price,change);
+    await PriceCache.save(srcVal,sym,raw);
+    renderFavList();
+  }catch(e){console.warn('scan failed:',code,e.message);}
+  finally{src=oldSrc;}
+}
+// 一括スキャン
+document.getElementById('favScanAll')?.addEventListener('click',async()=>{
+  if(favScanning) return;
+  favScanning=true;
+  const btn=document.getElementById('favScanAll');
+  const status=document.getElementById('favScanStatus');
+  btn.disabled=true;
+  const arr=await Favorites.list();
+  for(let i=0;i<arr.length;i++){
+    status.textContent=`スキャン中... ${i+1}/${arr.length}`;
+    try{await scanOneFav(arr[i].c,arr[i].s);}catch(e){}
+    await new Promise(r=>setTimeout(r,1500)); // レート制限
+  }
+  status.textContent=`完了 (${arr.length}銘柄)`;
+  btn.disabled=false; favScanning=false;
+  renderFavList();
+});
+// ソート/フィルタ/検索のイベント
+['favSort','favFilter','favSearch'].forEach(id=>{
+  document.getElementById(id)?.addEventListener('change',()=>renderFavList());
+  document.getElementById(id)?.addEventListener('input',()=>{if(id==='favSearch')renderFavList();});
+});
+
+
 // ファンダ永続データをDOM入力欄に復元
 (function(){ const m=FundPersist.getManual(); if(m) applyManualToDOM(m); })();
 
@@ -757,7 +986,7 @@ document.getElementById('btnReload').addEventListener('click',()=>run(true));
 document.getElementById('btnFundReload').addEventListener('click',()=>runFundOnly());
 document.getElementById('btnFav').addEventListener('click',()=>{
   const sym=getCurSym(),c=src==='yahoo'?sym.y:(sym.a||sym.y);
-  Favorites.toggle(c,src,sym.name); updateFavBtn(); renderFavorites();
+  Favorites.toggle(c,src,sym.name).then(()=>{updateFavBtn();renderFavList();});
 });
 if(avKey) document.getElementById('iKeyAV').value=avKey;
 document.getElementById('btnClearHist').addEventListener('click',()=>{
@@ -1011,6 +1240,7 @@ function calcHILOProxy(closes){
 // 感情指標まとめ取得
 async function fetchSentiment(market){
   const vixSym=market==='JP'?'^JNIV':'^VIX';
+  const vixFallback=market==='JP'?'^VIX':null; // 日経VIが取れない場合はVIXにフォールバック
   // 並列取得（失敗しても他の指標に影響しない）
   const [vixR,fgR,pcrR]=await Promise.allSettled([
     fetchYahooQuote(vixSym),
@@ -1018,7 +1248,7 @@ async function fetchSentiment(market){
     market==='US'?fetchPCR():Promise.resolve(null),
   ]);
   return{
-    vix: vixR.status==='fulfilled'?vixR.value:null,
+    vix: vixR.status==='fulfilled'&&vixR.value?vixR.value:(vixFallback?await fetchYahooQuote(vixFallback).catch(()=>null):null),
     fg:  fgR.status==='fulfilled'?fgR.value:null,
     pcr: pcrR.status==='fulfilled'&&pcrR.value?pcrR.value:
          (_fundJson?.indicators?.pcr?{ratio:_fundJson.indicators.pcr.value||_fundJson.indicators.pcr.ratio}:null),
@@ -2450,6 +2680,43 @@ function renderResult(result){
       ${bdRow('全総合 (大底70:30 / 天井55:45で合算)',IG.allBottom,IG.allTop,IG.allOverall,true)}
     </tbody></table>
     ${IG.fundOk?'':'<p style="font-size:10.5px;color:var(--t3);margin-top:4px">※ ファンダ入力/取得なしのため、全総合=テク+需給総合として表示中</p>'}`;
+
+  // ── ローソク足チャート ──
+  try{
+    const cc=document.getElementById('candleChart');
+    if(cc && typeof LightweightCharts!=='undefined'){
+      cc.innerHTML='';
+      const isDark=!document.documentElement.classList.contains('light');
+      const chart=LightweightCharts.createChart(cc,{
+        width:cc.clientWidth, height:320,
+        layout:{background:{type:'solid',color:isDark?'#0c1020':'#ffffff'},
+                textColor:isDark?'#7878a0':'#555570'},
+        grid:{vertLines:{color:isDark?'#181e32':'#e0e0e0'},horzLines:{color:isDark?'#181e32':'#e0e0e0'}},
+        timeScale:{timeVisible:false},
+      });
+      const series=chart.addCandlestickSeries({
+        upColor:'#1D9E75',downColor:'#D85A30',borderUpColor:'#1D9E75',borderDownColor:'#D85A30',
+        wickUpColor:'#1D9E75',wickDownColor:'#D85A30',
+      });
+      const candles=[];
+      const C=result.info?.closes||data?.closes, H=result.info?.highs||data?.highs,
+            L=result.info?.lows||data?.lows, O=data?.opens;
+      const dates=data?.dates||[];
+      if(C){
+        const n=Math.min(C.length, dates.length||C.length);
+        const startIdx=Math.max(0,n-120);
+        for(let i=startIdx;i<n;i++){
+          if(C[i]==null) continue;
+          const d=dates[i]||new Date(Date.now()-(n-i)*86400000).toISOString().slice(0,10);
+          candles.push({time:d, open:O?O[i]:C[i>0?i-1:i], high:H?H[i]:C[i], low:L?L[i]:C[i], close:C[i]});
+        }
+      }
+      if(candles.length) series.setData(candles);
+      chart.timeScale().fitContent();
+      new ResizeObserver(()=>{chart.applyOptions({width:cc.clientWidth});}).observe(cc);
+    }
+  }catch(e){console.warn('ローソク足描画エラー:',e);}
+
   const vd=verdictInfo(IG.allOverall);
   const vel=document.getElementById('verdict');
   vel.textContent=vd.t;
@@ -2631,9 +2898,9 @@ async function run(force){
   }
 
   // ─ Step 2: localStorage永続キャッシュ (前回セッションの株価) ─
-  const pcI=PriceCache.info(src,sym);
+  const pcI=await PriceCache.info(src,sym);
   if(!force && pcI && !pcI.stale){
-    const pc=PriceCache.load(src,sym);
+    const pc=await PriceCache.load(src,sym);
     if(pc?.closes?.length>=55){
       document.getElementById('dLoad').style.display='';
       try{
@@ -2695,7 +2962,7 @@ async function run(force){
       saveFundManual();
     }
     // 株価キャッシュをlocalStorageに永続保存
-    PriceCache.save(src,sym,raw);
+    await PriceCache.save(src,sym,raw);
 
     const d2=src==='yahoo'?sym.y:(sym.a||sym.y);
     document.getElementById('mainTitle').textContent=
