@@ -2757,7 +2757,7 @@ function computeMarketState(result){
   return{label,note,color:palette.c,bg:palette.bg,overall:o,regime:reg};
 }
 
-/* エントリー準備度（試験実装）
+/* エントリー準備度（2026-07 バックテスト校正済: しきい値60/50/35/20 + 深度ボーナス）
    総合スコアとは分離し、「底の深さ」「反転確認」「短期安定化」「恐怖」「データ自信度」を評価する。 */
 function computeEntryReadiness(result){
   const I=result.integration||{},L3=result.layer3||{},L4=result.layer4||{},L5=result.layer5||{},S=result.series||{};
@@ -2776,19 +2776,25 @@ function computeEntryReadiness(result){
   const overall=I.allOverall??50;
   if(overall>45)score*=.72;
   if(overall>60)score*=.55;
-  score=Math.round(clamp100(score));
+  // 深度ボーナス(2026-07校正): 青天井超過D×0.5(上限+10)。A級パニック時のみ効く
+  const depthD=result.depth?.d??0;
+  const depthBonus=Math.min(10, 0.5*depthD);
+  score=Math.round(clamp100(score+depthBonus));
+  // しきい値はバックテスト校正済み(6銘柄×32年: ≧60は平均+7.7〜8.0%/勝率88〜93%、50-59は+5.2〜6.9%/76%)
   let label='待機',color='#7878a0',action='条件不足。極端値または反転確認を待つ';
-  if(score>=85){label='反転確認済み';color='#1D9E75';action='分割エントリーの最終確認段階（損切り条件を先に設定）';}
-  else if(score>=70){label='打診候補';color='#4FAE87';action='一括ではなく小さな打診を検討する段階';}
-  else if(score>=50){label='準備';color='#BA7517';action='監視を強化し、反転確認の追加を待つ';}
-  else if(score>=25){label='監視';color='#8A7CC8';action='底寄りの兆候はあるが、まだ早い';}
-  return{score,label,color,action,parts:[
+  if(score>=60){label='反転確認済み';color='#1D9E75';action='分割エントリーの最終確認段階（損切り条件を先に設定）';}
+  else if(score>=50){label='打診候補';color='#4FAE87';action='一括ではなく小さな打診を検討する段階';}
+  else if(score>=35){label='準備';color='#BA7517';action='監視を強化し、反転確認の追加を待つ';}
+  else if(score>=20){label='監視';color='#8A7CC8';action='底寄りの兆候はあるが、まだ早い';}
+  const parts=[
     {name:'底の深さ',value:Math.round(extreme),weight:35},
     {name:'反転確認',value:Math.round(confirmation),weight:25},
     {name:'短期安定化',value:Math.round(stabilization),weight:20},
     {name:'市場心理',value:Math.round(sentiment),weight:10},
     {name:'データ自信度',value:Math.round(confidence),weight:10},
-  ]};
+  ];
+  if(depthBonus>=0.5) parts.push({name:'深度ボーナス',value:Math.round(depthBonus),weight:'+'});
+  return{score,label,color,action,parts,depthBonus:Math.round(depthBonus*10)/10};
 }
 
 function renderResult(result){
@@ -2945,14 +2951,14 @@ function renderResult(result){
   document.getElementById('entryReadinessPanel').innerHTML=`<div class="state-card" style="border-color:${er.color}66;background:${er.color}0d">
     <div class="entry-grid">
       <div>
-        <div style="font-size:11px;color:var(--t2)">エントリー準備度（試験実装）</div>
+        <div style="font-size:11px;color:var(--t2)">エントリー準備度（バックテスト校正済 2026-07）</div>
         <div class="entry-score" style="color:${er.color}">${er.score}<span style="font-size:14px"> / 100</span></div>
         <div style="text-align:center"><span class="state-pill" style="color:${er.color};background:${er.color}18">${er.label}</span></div>
       </div>
-      <div>${er.parts.map(p=>`<div class="entry-bar-row"><span>${p.name}<small style="color:var(--t3)"> ${p.weight}%</small></span><div class="entry-track"><div class="entry-fill" style="width:${p.value}%;background:${er.color}"></div></div><span style="font-family:var(--mono);text-align:right">${p.value}</span></div>`).join('')}</div>
+      <div>${er.parts.map(p=>`<div class="entry-bar-row"><span>${p.name}<small style="color:var(--t3)"> ${typeof p.weight==='number'?p.weight+'%':p.weight}</small></span><div class="entry-track"><div class="entry-fill" style="width:${p.value}%;background:${er.color}"></div></div><span style="font-family:var(--mono);text-align:right">${p.value}</span></div>`).join('')}</div>
     </div>
     <div style="font-size:11px;color:var(--t2);margin-top:7px">${er.action}</div>
-    <div style="font-size:10px;color:var(--t3);margin-top:4px">総合スコアとは別の補助指標です。バックテスト完了までは売買条件に直接組み込まず、記録・検証用として扱います。</div>
+    <div style="font-size:10px;color:var(--t3);margin-top:4px">目安: ≧60(反転確認済み)は銘柄あたり約10年に1回・過去成績 平均+7.7〜8.0%/勝率88〜93%、50-59(打診候補)は+5.2〜6.9%/勝率76%。判定はしきい値ルールによる自動表示です。</div>
   </div>`;
   const bdRow=(label,b,t,o,strong)=>`<tr${strong?' style="background:var(--bg3)"':''}>
     <td style="text-align:left;${strong?'font-weight:600':''}">${label}</td>
