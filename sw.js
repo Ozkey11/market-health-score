@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mh-score-v4';
+const CACHE_NAME = 'mh-score-v5';
 const PRECACHE = ['./', './manifest.json'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(PRECACHE)));
