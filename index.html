@@ -147,6 +147,23 @@ button:disabled{opacity:.4;cursor:default}
 .entry-fill{height:100%;border-radius:5px}
 .chart-toolbar{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
 @media(max-width:560px){.entry-grid{grid-template-columns:1fr}.entry-score{text-align:left}.entry-bar-row{grid-template-columns:82px 1fr 32px}}
+
+/* ── EDGE パネル (2026-07-24) ── */
+.edge-card{border:.5px solid var(--bd);border-radius:var(--r);padding:11px 12px;background:var(--bg);text-align:left}
+.edge-prob{font-size:30px;font-weight:700;line-height:1.1;font-family:var(--mono)}
+.edge-base{font-size:11px;color:var(--t2);margin-top:2px}
+.edge-row{display:flex;justify-content:space-between;gap:8px;font-size:11.5px;padding:3px 0;border-bottom:.5px dotted var(--bd)}
+.edge-row:last-child{border-bottom:0}
+.edge-tag{display:inline-block;font-size:10px;padding:1px 6px;border-radius:8px;margin-left:5px}
+.edge-det{margin-top:8px}
+.edge-det summary{cursor:pointer;font-size:11px;color:var(--t2);padding:4px 0;list-style:none}
+.edge-det summary::-webkit-details-marker{display:none}
+.edge-det summary:before{content:'▸ ';color:var(--t3)}
+.edge-det[open] summary:before{content:'▾ '}
+.edge-det table{width:100%;border-collapse:collapse;margin-top:5px}
+.edge-det th,.edge-det td{font-size:10.5px;padding:3px 4px;border-bottom:.5px solid var(--bd);text-align:left}
+.edge-det th{color:var(--t2);font-weight:600}
+.edge-warn{border-left:3px solid #D85A30;padding:7px 9px;background:rgba(216,90,48,.09);border-radius:6px;margin-top:8px;font-size:11.5px}
 </style>
 </head>
 <body>
@@ -367,6 +384,7 @@ button:disabled{opacity:.4;cursor:default}
     <div id="zoneNote" style="font-size:11px;color:var(--t3);margin-top:6px"></div>
     <div id="depthPanel" style="margin:10px auto 0;max-width:560px"></div>
     <div id="entryReadinessPanel" style="margin:10px auto 0;max-width:560px"></div>
+    <div id="edgePanel" style="margin:10px auto 0;max-width:560px"></div>
     <div id="scoreBreakdown" style="margin:14px auto 0;max-width:560px;overflow-x:auto"></div>
     <div class="conf-row" style="justify-content:center;margin-top:14px">
       <div>
@@ -535,15 +553,24 @@ var PriceCache={
       const d={opens:raw.opens?.slice(-max),closes:raw.closes?.slice(-max),highs:raw.highs?.slice(-max),
                lows:raw.lows?.slice(-max),volumes:raw.volumes?.slice(-max),
                dates:raw.dates?.slice(-max),
-               meta:raw.meta, at:Date.now()};
+               meta:raw.meta, provisionalLast:!!raw.provisionalLast, at:Date.now()};
       await IDB.set(this._k(s,sym),d);
     }catch(e){console.warn('キャッシュ保存失敗:',e);}
   },
-  async info(s,sym){
+  async info(s,sym,market){
     const d=await this.load(s,sym);
     if(!d?.closes?.length) return null;
-    const stale=!Array.isArray(d.dates)||d.dates.length!==d.closes.length;
-    return{days:d.closes.length, at:d.at, stale};
+    const broken=!Array.isArray(d.dates)||d.dates.length!==d.closes.length;
+    const lastDate=broken?null:d.dates[d.dates.length-1];
+    // 鮮度判定(2026-07 追加): 「あるべき最新取引日」に達していなければ古いとみなす。
+    // 旧実装は日付を一切見ておらず、一度キャッシュすると更新されなかった。
+    let outdated=false, expected=null;
+    try{
+      expected=expectedLastSessionDate(market||'US');
+      outdated=!lastDate||lastDate<expected;
+    }catch(e){ outdated=false; }
+    return{days:d.closes.length, at:d.at, stale:broken, lastDate, expected, outdated,
+           provisional:!!d.provisionalLast};
   },
 };
 
@@ -729,6 +756,56 @@ const CONFIG={
     macdDiv:0.30, rsiDiv:0.30, mfiDiv:0.20, obvDiv:0.20,
     // 将来追加用（有効化時は合計1.0になるよう再配分）
     // pinbar:0.00, engulfing:0.00, fakeout:0.00, failedBreak:0.00,
+  },
+
+  /* ══════════════════════════════════════════════════════════
+     EDGE: バックテスト実測値の反映 (2026-07-24 / 分析レポートv5.0〜v9.0)
+     すべて「20日先の上昇率が、その市場の平常時から何ptずれたか(基準差)」。
+     米国株37銘柄(1999-2026)・日本株29銘柄(2000-2026)の実測中央値。
+     ※ 基準差±3pt未満は方向感なしとみなし、UIには数値を出さない(v8.0 §10-2 B5)
+     ══════════════════════════════════════════════════════════ */
+  edge:{
+    baseUpRate:{US:55.6, JP:51.9},          // 無条件の20日上昇率(%)
+    minShowDelta:3.0,                        // これ未満の基準差は表示しない
+    minSamples:30,                           // これ未満の該当回数は「参考」扱い
+    // 各要因の基準差(pt)と該当銘柄数・陽性率。出典は分析レポートv8.0 第3〜9章
+    factors:{
+      drop5d10:  {US:{d:+2.0,pos:0.78,n:37}, JP:{d:+5.4,pos:0.90,n:29}, label:'5日で-10%以上の急落',    ref:'v8.0 §4'},
+      drop1d7:   {US:{d:+1.2,pos:0.74,n:37}, JP:{d:+6.3,pos:0.70,n:29}, label:'1日で-7%以上の急落',     ref:'v8.0 §4'},
+      low20:     {US:{d:+3.3,pos:0.84,n:37}, JP:{d:+4.3,pos:0.69,n:29}, label:'20日安値ブレイク',        ref:'v8.0 §3'},
+      low52:     {US:{d:+0.1,pos:0.58,n:37}, JP:{d:+5.5,pos:0.69,n:29}, label:'52週安値ブレイク',        ref:'v8.0 §3'},
+      high52:    {US:{d:-1.8,pos:0.43,n:37}, JP:{d:+1.0,pos:0.36,n:29}, label:'52週高値ブレイク',        ref:'v8.0 §3'},
+      surge5d10: {US:{d:-1.7,pos:0.65,n:37}, JP:{d:-3.2,pos:0.31,n:29}, label:'5日で+10%以上の急騰',     ref:'v8.0 §4'},
+      rateDown:  {US:{d:+5.6,pos:0.86,n:37}, JP:{d:null,pos:null,n:0},  label:'長期金利が20日で0.3%超低下', ref:'v8.0 §7'},
+      rateUp:    {US:{d:-3.6,pos:0.24,n:37}, JP:{d:-15.7,pos:0.19,n:29},label:'長期金利が20日で0.3%超上昇', ref:'v8.0 §7'},
+      sep:       {US:{d:-3.1,pos:0.30,n:37}, JP:{d:-6.3,pos:0.38,n:29}, label:'9月(最弱月)',            ref:'v8.0 §6'},
+      summer:    {US:{d:-2.4,pos:0.19,n:37}, JP:{d:-3.8,pos:0.24,n:29}, label:'夏枯れ(7-8月)',          ref:'v8.0 §6'},
+      dec:       {US:{d:+2.9,pos:0.68,n:37}, JP:{d:+7.2,pos:0.52,n:29}, label:'クリスマス相場(12月)',     ref:'v8.0 §6'},
+      volHeavy:  {US:{d:-2.3,pos:0.59,n:37}, JP:{d:+1.4,pos:0.52,n:29}, label:'出来高3倍超',            ref:'v8.0 §5'},
+      volThin:   {US:{d:+0.2,pos:0.32,n:37}, JP:{d:-1.5,pos:0.31,n:29}, label:'出来高薄(0.7倍未満)',     ref:'v8.0 §5'},
+    },
+    /* 出来高レジーム(v6.0 §5 / v7.0 §9): 逆張りシグナルの信頼度を出来高で補正。
+       米国は「静かな押し目」が効き、日本は「投げを伴う底」が効く(符号が正反対)。
+       値は Entry Readiness への乗数(±)。 */
+    volumeRegime:{
+      US:{quiet:+0.08, heavy:-0.12, quietTh:1.0, heavyTh:1.5,
+          note:'米国株は逆張りが静かな相場で効く(高出来高でER -2.45pt/勝率-9.4pt)'},
+      JP:{quiet:-0.08, heavy:+0.12, quietTh:1.0, heavyTh:1.5,
+          note:'日本株は投げを伴う底が効く(高出来高でbdir +1.73pt/64%の銘柄で改善)'},
+    },
+    /* 静けさの天井(v4.1 §1 / v5.0 §5-2): 恐怖の不在×過熱。20日ではなく60日で効く。
+       米: 日経VI≦18×PCR≦0.7 → 60日-7.8pt / VIX≦15×PCR≦0.7 → -5.5pt */
+    quietTop:{ vixUS:15, vixJP:18, pcr:0.8, rsi:70, ex60:-5.5,
+               memeMult:2.0, note:'空売りではなく利確・新規停止・ヘッジのトリガーとして使う' },
+    /* 保有・出口プラン(v9.0 §2-3): 米国はエッジが60日まで伸び、日本は5日で頭打ち。
+       損切りはどの水準でも成績を悪化させた(米 損切りなし+7.85 → -10%で+4.24)。 */
+    holding:{
+      US:{days:'40〜60日', takeProfit:null,
+          note:'米国株は超過リターンが60日まで伸びる(bdir≧60: 20日+6.1 → 60日+9.7)。早い利確は不利'},
+      JP:{days:'5〜20日', takeProfit:'+15〜20%',
+          note:'日本株は5日で20日ぶんの92%に到達し、その後は横ばい〜減衰。+15%利確で+2.95→+4.74'},
+      stopNote:'価格ベースの損切りは日米ともすべての水準で成績を悪化させた(逆行の中央値が-9%あるため必ず刈られる)。退出は「シグナル失効(深度Dの縮小・レジーム転換)」で判断する',
+    },
   },
 
   // Layer5: Confidence計算パラメータ
@@ -1105,93 +1182,231 @@ if(fhKey) document.getElementById('iKeyFH').value=fhKey;
 
 
 
+
+/* ═══════════════════════════════════════════════
+   NETWORK LAYER (2026-07 全面改修)
+   旧実装: 3エンドポイント × 4プロキシ を「逐次await・タイムアウト無し」で試行。
+           1つ詰まると1銘柄の取得に数分かかっていた。
+   新実装: ①全候補にAbortControllerでタイムアウト
+           ②同一ウェーブ内はPromise.anyで並列レース(最速の1本を採用)
+           ③成功したプロキシを記憶し次回から最優先
+═══════════════════════════════════════════════ */
+const NET={
+  timeoutMs:7000,
+  key:'sp500_proxy_best_v2',
+  proxies:[
+    {id:'direct',     mk:u=>u},
+    {id:'allorigins', mk:u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u)},
+    {id:'codetabs',   mk:u=>'https://api.codetabs.com/v1/proxy?quest='+encodeURIComponent(u)},
+    {id:'corsproxy',  mk:u=>'https://corsproxy.io/?url='+encodeURIComponent(u)},
+    {id:'isomorphic', mk:u=>'https://cors.isomorphic-git.org/'+u},
+    {id:'thingproxy', mk:u=>'https://thingproxy.freeboard.io/fetch/'+u},
+  ],
+  best(){try{return localStorage.getItem(this.key)||'';}catch(e){return '';}},
+  setBest(id){try{localStorage.setItem(this.key,id);}catch(e){}},
+  // 成功実績のあるプロキシを先頭に持ってきた順序を返す
+  order(){
+    const b=this.best();
+    if(!b) return this.proxies.slice();
+    const i=this.proxies.findIndex(p=>p.id===b);
+    if(i<0) return this.proxies.slice();
+    return [this.proxies[i], ...this.proxies.filter((_,j)=>j!==i)];
+  },
+};
+
+// Promise.any の簡易フォールバック(古い環境向け)
+const _any = (typeof Promise.any==='function')
+  ? (ps)=>Promise.any(ps)
+  : (ps)=>new Promise((res,rej)=>{
+      let left=ps.length, errs=[];
+      if(!left) return rej(new Error('候補なし'));
+      ps.forEach((p,i)=>p.then(res).catch(e=>{errs[i]=e; if(--left===0) rej(new Error(errs.map(x=>x&&x.message).join(' / ')));}));
+    });
+
+async function netFetch(url,{timeout=NET.timeoutMs,type='json'}={}){
+  const ac=(typeof AbortController!=='undefined')?new AbortController():null;
+  const t=ac?setTimeout(()=>ac.abort(),timeout):null;
+  try{
+    const opt={cache:'no-store'};
+    if(ac) opt.signal=ac.signal;
+    const r=await fetch(url,opt);
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    return type==='text'?await r.text():await r.json();
+  }finally{ if(t) clearTimeout(t); }
+}
+
+/* 複数URL × 複数プロキシを「ウェーブ単位で並列レース」する。
+   wave1(最速候補4本)で決着しなければwave2へ。全滅時のみ例外。 */
+async function raceFetch(rawUrls,{timeout=NET.timeoutMs,type='json',validate=null,waveSize=5,maxWaves=2}={}){
+  const urls=Array.isArray(rawUrls)?rawUrls:[rawUrls];
+  const order=NET.order();
+  /* 候補の並べ方が速度を決める。プロキシごとに全URLを固めると、
+     1つのプロキシがハングしただけでウェーブ全体がタイムアウト待ちになる。
+     「各プロキシの1本目 → 各プロキシの2本目」の順に交互配置し、
+     ウェーブ内に必ず複数のプロキシが混ざるようにする。 */
+  const cands=[];
+  for(let ui=0; ui<urls.length; ui++)
+    for(const p of order) cands.push({id:p.id, url:p.mk(urls[ui])});
+  let lastErr=null;
+  // 全経路が沈黙した場合でも待ち続けないよう、試行ウェーブ数に上限を設ける
+  const limit=Math.min(cands.length, waveSize*maxWaves);
+  for(let i=0;i<limit;i+=waveSize){
+    const wave=cands.slice(i,i+waveSize);
+    const tasks=wave.map(c=>netFetch(c.url,{timeout,type}).then(v=>{
+      if(validate&&!validate(v)) throw new Error('内容不正');
+      NET.setBest(c.id);
+      return v;
+    }));
+    try{ return await _any(tasks); }
+    catch(e){ lastErr=e; }
+  }
+  throw new Error(lastErr?.message||'全経路で取得失敗');
+}
+
+/* ═══════════════════════════════════════════════
+   取引日カレンダー(鮮度判定用)
+   キャッシュが「いつの終値まで持っているか」を判定し、
+   古ければ差分だけを取りに行くために使う。
+═══════════════════════════════════════════════ */
+function marketNowParts(market){
+  const tz = market==='JP' ? 'Asia/Tokyo' : 'America/New_York';
+  try{
+    const f=new Intl.DateTimeFormat('en-CA',{timeZone:tz,year:'numeric',month:'2-digit',
+      day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false});
+    const p={}; f.formatToParts(new Date()).forEach(x=>{p[x.type]=x.value;});
+    const hour = p.hour==='24' ? '00' : p.hour;
+    return {date:`${p.year}-${p.month}-${p.day}`, hm:(+hour)*60+(+p.minute)};
+  }catch(e){
+    const d=new Date();
+    return {date:d.toISOString().slice(0,10), hm:d.getUTCHours()*60+d.getUTCMinutes()};
+  }
+}
+/* 「この時点で存在しているはずの最新の取引日」(祝日は考慮しない近似)。
+   祝日で1日ズレても、差分取得は軽いので実害はない。 */
+function expectedLastSessionDate(market){
+  const closeMin = market==='JP' ? (15*60+10) : (16*60+5); // 引け+数分
+  const {date,hm}=marketNowParts(market);
+  let d=new Date(date+'T00:00:00Z');
+  if(hm<closeMin) d=new Date(d.getTime()-86400000);
+  for(let i=0;i<7;i++){
+    const w=d.getUTCDay();
+    if(w!==0&&w!==6) break;
+    d=new Date(d.getTime()-86400000);
+  }
+  return d.toISOString().slice(0,10);
+}
+/* 2本の時系列を日付キーでマージ(新しい方を優先)。差分取得後の結合に使う。 */
+function mergeSeries(oldD,newD){
+  if(!oldD?.dates?.length) return newD;
+  if(!newD?.dates?.length) return oldD;
+  const map=new Map();
+  const push=(src)=>{
+    const n=src.dates.length;
+    for(let i=0;i<n;i++){
+      const dt=src.dates[i];
+      if(!dt) continue;
+      map.set(dt,{o:src.opens?.[i],h:src.highs?.[i],l:src.lows?.[i],c:src.closes?.[i],v:src.volumes?.[i]});
+    }
+  };
+  push(oldD); push(newD); // newDが後勝ち
+  const keys=[...map.keys()].sort();
+  const out={opens:[],closes:[],highs:[],lows:[],volumes:[],dates:[],
+             meta:newD.meta||oldD.meta};
+  for(const k of keys){
+    const r=map.get(k);
+    out.dates.push(k); out.opens.push(r.o); out.highs.push(r.h);
+    out.lows.push(r.l); out.closes.push(r.c); out.volumes.push(r.v);
+  }
+  const n=out.closes.length;
+  out.meta={...(out.meta||{}), price:out.closes[n-1], prev:out.closes[n-2]};
+  return out;
+}
+
 /* ═══════════════════════════════════════════════
    DATA FETCHING
 ═══════════════════════════════════════════════ */
-async function fetchYahoo(sym){
-  // ── Yahoo Finance を優先試行 ─────────────────────────────────────────
-  const bases=[
-    `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=2y`,
-    `https://query2.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=2y`,
-    `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=1y`,
-  ];
-  const mkProxies=[
-    u=>u,
-    u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u),
-    u=>'https://corsproxy.io/?'+encodeURIComponent(u),
-    u=>'https://api.codetabs.com/v1/proxy?quest='+encodeURIComponent(u),
-  ];
-  let lastErr='';
-  for(const base of bases){
-    for(const mk of mkProxies){
-      try{
-        const r=await fetch(mk(base));
-        if(!r.ok){lastErr='HTTP '+r.status; continue;}
-        const j=await r.json();
-        if(j.chart?.error){lastErr=j.chart.error.description||'chart error'; continue;}
-        if(!j.chart?.result?.[0]){lastErr='データなし'; continue;}
-        const res=j.chart.result[0], q=res.indicators.quote[0];
-        const dispName=res.meta.shortName||res.meta.longName||sym;
-        const ts=res.timestamp||[];
-        const dates=ts.map(t=>new Date(t*1000).toISOString().slice(0,10));
-        return{opens:q.open,closes:q.close,highs:q.high,lows:q.low,volumes:q.volume,dates,
-               meta:{price:res.meta.regularMarketPrice,prev:res.meta.chartPreviousClose,
-                     symbol:sym,name:dispName}};
-      }catch(e){lastErr=e.message; continue;}
-    }
+function parseYahooChart(j,sym){
+  const res=j?.chart?.result?.[0];
+  if(!res) return null;
+  const q=res.indicators?.quote?.[0]||{};
+  const ts=res.timestamp||[];
+  if(!ts.length||!q.close) return null;
+  const dispName=res.meta?.shortName||res.meta?.longName||sym;
+  // Yahooのtimestampは「その市場の取引日」を表すため、市場ローカル日付に変換する
+  const tzOff=(res.meta?.gmtoffset||0)*1000;
+  const dates=ts.map(t=>new Date(t*1000+tzOff).toISOString().slice(0,10));
+  const out={opens:q.open||[],closes:q.close.slice(),highs:q.high||[],lows:q.low||[],
+             volumes:q.volume||[],dates,
+             meta:{price:res.meta?.regularMarketPrice, prev:res.meta?.chartPreviousClose,
+                   symbol:sym, name:dispName, gmtoffset:res.meta?.gmtoffset}};
+  // ザラ場中は最終バーのcloseがnullのことがある。現在値で暫定的に埋める。
+  const n=out.closes.length;
+  if(n && (out.closes[n-1]==null||isNaN(out.closes[n-1])) && Number.isFinite(res.meta?.regularMarketPrice)){
+    out.closes[n-1]=res.meta.regularMarketPrice;
+    if(out.highs[n-1]==null) out.highs[n-1]=res.meta.regularMarketDayHigh??out.closes[n-1];
+    if(out.lows[n-1]==null)  out.lows[n-1] =res.meta.regularMarketDayLow??out.closes[n-1];
+    if(out.opens[n-1]==null) out.opens[n-1]=out.closes[n-1];
+    out.provisionalLast=true;
   }
+  return out;
+}
 
-  // ── Stooq フォールバック ─────────────────────────────────────────────
-  // 注意: Stooqは2026年3月以降、CSV取得にAPIキーが必須となったため
-  // 無認証アクセスでは多くの場合失敗する（成功すればラッキー程度の扱い）
-  function toStooq(s){
+async function fetchYahoo(sym,range='2y'){
+  const enc=encodeURIComponent(sym);
+  const urls=[
+    `https://query1.finance.yahoo.com/v8/finance/chart/${enc}?interval=1d&range=${range}`,
+    `https://query2.finance.yahoo.com/v8/finance/chart/${enc}?interval=1d&range=${range}`,
+  ];
+  let yahooErr='';
+  try{
+    const j=await raceFetch(urls,{timeout:7000,maxWaves:2,validate:v=>!!v?.chart?.result?.[0]?.timestamp});
+    const parsed=parseYahooChart(j,sym);
+    if(parsed) return parsed;
+    yahooErr='データ形式不正';
+  }catch(e){ yahooErr=e.message||'取得失敗'; }
+
+  // ── Stooq フォールバック(並列版) ─────────────────────────────
+  function toStooq(s2){
     const m={'^GSPC':'^spx','^IXIC':'^ndq','^DJI':'^dji','^N225':'^n225',
              '^VIX':'^vix','^JNIV':'^jvix','SPY':'spy.us','QQQ':'qqq.us',
              'DIA':'dia.us','GLD':'gld.us','EWJ':'ewj.us','EWH':'ewh.us',
              'BRK-B':'brk-b.us'};
-    if(m[s]) return m[s];
-    if(s.endsWith('.T')) return s.replace('.T','.jp');
-    if(/^[A-Z]{1,5}(-[A-Z])?$/.test(s)) return s.toLowerCase()+'.us';
-    return s.toLowerCase();
+    if(m[s2]) return m[s2];
+    if(s2.endsWith('.T')) return s2.replace('.T','.jp');
+    if(/^[A-Z]{1,5}(-[A-Z])?$/.test(s2)) return s2.toLowerCase()+'.us';
+    return s2.toLowerCase();
   }
   let stooqErr='';
-  async function tryStooq(){
+  try{
     const ss=toStooq(sym);
     const to=new Date(), fr=new Date(to-2*365*24*3600*1000);
     const fmt=d=>d.toISOString().slice(0,10).replace(/-/g,'');
     const url=`https://stooq.com/q/d/l/?s=${ss}&d1=${fmt(fr)}&d2=${fmt(to)}&i=d`;
-    const mks=[u=>u,
-      u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u),
-      u=>'https://corsproxy.io/?'+encodeURIComponent(u)];
-    for(const mk of mks){
-      try{
-        const r=await fetch(mk(url));
-        if(!r.ok){stooqErr='HTTP '+r.status; continue;}
-        const txt=await r.text();
-        if(!txt.trim()){stooqErr='空レスポンス'; continue;}
-        if(txt.includes('No data')||txt.includes('<html')||txt.startsWith('<')){stooqErr='APIキー要求またはシンボル未対応'; continue;}
-        const rows=txt.trim().split('\n').slice(1)
-          .map(l=>{const[dt,o,h,lv,c,v]=l.split(',');return{date:dt,open:+o,high:+h,low:+lv,close:+c,vol:+v||0};})
-          .filter(r=>!isNaN(r.close)&&r.close>0);
-        if(rows.length<55){stooqErr='データ不足('+rows.length+'日分)'; continue;}
-        const n=rows.length;
-        return{opens:rows.map(r=>r.open),closes:rows.map(r=>r.close),highs:rows.map(r=>r.high),
-               lows:rows.map(r=>r.low),volumes:rows.map(r=>r.vol),
-               dates:rows.map(r=>r.date),
-               meta:{price:rows[n-1].close,prev:rows[n-2].close,
-                     symbol:sym,name:sym+' (Stooq)'}};
-      }catch(e){stooqErr=e.message; continue;}
+    const txt=await raceFetch([url],{timeout:6000,maxWaves:1,type:'text',
+      validate:t=>typeof t==='string'&&t.length>200&&!t.startsWith('<')&&!t.includes('No data')});
+    const rows=txt.trim().split('\n').slice(1)
+      .map(l=>{const[dt,o,h,lv,c,v]=l.split(',');return{date:dt,open:+o,high:+h,low:+lv,close:+c,vol:+v||0};})
+      .filter(r=>!isNaN(r.close)&&r.close>0);
+    if(rows.length>=55){
+      const n=rows.length;
+      return{opens:rows.map(r=>r.open),closes:rows.map(r=>r.close),highs:rows.map(r=>r.high),
+             lows:rows.map(r=>r.low),volumes:rows.map(r=>r.vol),dates:rows.map(r=>r.date),
+             meta:{price:rows[n-1].close,prev:rows[n-2].close,symbol:sym,name:sym+' (Stooq)'}};
     }
-    return null;
-  }
-  const stooq=await tryStooq();
-  if(stooq) return stooq;
+    stooqErr='データ不足('+rows.length+'日分)';
+  }catch(e){ stooqErr=e.message||'取得失敗'; }
 
   throw new Error(
-    `Yahoo Finance / Stooq [${sym}]: 取得失敗 (Yahoo: ${lastErr||'不明'} / Stooq: ${stooqErr||'不明'})\n`
+    `Yahoo Finance / Stooq [${sym}]: 取得失敗 (Yahoo: ${yahooErr||'不明'} / Stooq: ${stooqErr||'不明'})\n`
     +`※ Stooqは2026年3月よりCSV取得にAPIキーが必須となり利用不可な場合があります。\n`
     +`　個別株は Alpha Vantage タブ（無料APIキー登録）の利用を推奨します。`
   );
+}
+
+/* 差分取得: キャッシュがある銘柄は直近1か月だけ取りに行き既存データへマージする。
+   2年分(約60KB)→1か月分(約3KB)になり、体感が大きく変わる。 */
+async function fetchYahooDelta(sym){
+  return await fetchYahoo(sym,'3mo');
 }
 
 
@@ -1269,73 +1484,49 @@ async function fetchFH(key, sym){
   throw new Error(`Finnhub [${sym}]: 取得失敗。最後のレスポンス: ${lastRaw}`);
 }
 
-function detectMarket(sym){
-  if(!sym) return 'US';
-  const s=sym.toUpperCase();
-  return (s.endsWith('.T')||s==='^N225'||s==='^JNIV'||s==='EWJ'||s==='1306.T')?'JP':'US';
-}
 
 async function fetchYahooQuote(sym){
-  const bases=[
-    `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=5d`,
-    `https://query2.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=5d`,
+  const enc=encodeURIComponent(sym);
+  const urls=[
+    `https://query1.finance.yahoo.com/v8/finance/chart/${enc}?interval=1d&range=5d`,
+    `https://query2.finance.yahoo.com/v8/finance/chart/${enc}?interval=1d&range=5d`,
   ];
-  const mks=[u=>u,
-    u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u),
-    u=>'https://corsproxy.io/?'+encodeURIComponent(u)];
-  for(const base of bases) for(const mk of mks){
-    try{
-      const r=await fetch(mk(base));
-      if(!r.ok) continue;
-      const j=await r.json();
-      const res=j.chart?.result?.[0];
-      if(!res) continue;
-      return{price:res.meta.regularMarketPrice, name:res.meta.shortName||sym};
-    }catch(e){continue;}
-  }
-  return null;
+  try{
+    const j=await raceFetch(urls,{timeout:6000,validate:v=>!!v?.chart?.result?.[0]?.meta});
+    const res=j.chart.result[0];
+    return{price:res.meta.regularMarketPrice, name:res.meta.shortName||sym};
+  }catch(e){ return null; }
+}
+
+function detectMarket(sym){
+  if(!sym) return 'US';
+  if(/\.T$/i.test(sym)||/^\^N225$/i.test(sym)||/^\^JNIV$/i.test(sym)||/^[0-9]{4}$/.test(sym)) return 'JP';
+  return 'US';
 }
 
 // CNN Fear & Greed Index
 async function fetchFG(){
   const url='https://production.dataviz.cnn.io/index/fearandgreed/graphdata';
-  const mks=[u=>u,
-    u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u),
-    u=>'https://corsproxy.io/?'+encodeURIComponent(u)];
-  for(const mk of mks){
-    try{
-      const r=await fetch(mk(url));
-      if(!r.ok) continue;
-      const j=await r.json();
-      const score=j.fear_and_greed?.score;
-      if(score==null) continue;
-      return{score:+score, rating:j.fear_and_greed?.rating||''};
-    }catch(e){continue;}
-  }
-  return null;
+  try{
+    const j=await raceFetch([url],{timeout:6000,validate:v=>v?.fear_and_greed?.score!=null});
+    return{score:+j.fear_and_greed.score, rating:j.fear_and_greed?.rating||''};
+  }catch(e){ return null; }
 }
 
 // CBOE Put/Call Ratio（エクイティ P/C = CPCE）
 async function fetchPCR(){
-  // CBOE の公開 CSV を複数 URL で試みる
   const urls=[
     'https://cdn.cboe.com/api/global/us_indices/daily_prices/CPCE_History.csv',
     'https://cdn.cboe.com/data/us/futures/market-statistics/daily-market-statistics/CPCE.csv',
   ];
-  const mks=[u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u),
-             u=>'https://corsproxy.io/?'+encodeURIComponent(u)];
-  for(const url of urls) for(const mk of mks){
-    try{
-      const r=await fetch(mk(url));
-      if(!r.ok) continue;
-      const txt=await r.text();
-      const lines=txt.trim().split('\n').filter(l=>l.trim());
-      // 最終行から P/C ratio を取得
-      const last=lines[lines.length-1].split(',');
-      const val=parseFloat(last[last.length-1]||last[1]);
-      if(!isNaN(val)&&val>0&&val<5) return{ratio:val};
-    }catch(e){continue;}
-  }
+  try{
+    const txt=await raceFetch(urls,{timeout:6000,type:'text',
+      validate:t=>typeof t==='string'&&t.includes(',')&&t.length>50});
+    const lines=txt.trim().split('\n').filter(l=>l.trim());
+    const last=lines[lines.length-1].split(',');
+    const val=parseFloat(last[last.length-1]||last[1]);
+    if(!isNaN(val)&&val>0&&val<5) return{ratio:val};
+  }catch(e){}
   return null;
 }
 
@@ -1932,7 +2123,7 @@ function computeLayer2(C,H,L,V,regime){
     topScore,bottomScore,items,
     categories:CATS.map(c=>({label:c.label,items:items.filter(it=>it.cat===c.key)})),
     regimeMult:{oscMult,devMult},
-    vals:{ pz:pzV, ma50d:ma50d, atr:atrV?atrV.ratio:null },  // v3.1: 深度D値計算用の生値 (atrは比率のみ)
+    vals:{ pz:pzV, ma50d:ma50d, atr:atrV?atrV.ratio:null, rsi:rsiV },  // v3.1: 深度D値計算用の生値 (atrは比率のみ) / rsiはEDGE用
   };
 }
 // ─── Layer2 解釈テキスト関数（復元）─────────────────────────────────
@@ -2512,7 +2703,8 @@ function analyse({opens:O=[],closes:C,highs:H,lows:L,volumes:V,dates:D=[],meta},
   return{
     layer1:regime, layer2, layer3, layer4, layer5, fund, integration, depth,
     info:{cur,prev:meta.prev,pch,n,symbol:meta.symbol,name:meta.name,ma50,ma200,market:mk},
-    series:{opens:O,closes:C,highs:H,lows:L,volumes:V,dates:D}
+    series:{opens:O,closes:C,highs:H,lows:L,volumes:V,dates:D},
+    __sentiment:sentiment
   };
 }
 
@@ -2528,6 +2720,12 @@ function computeHistoricalScores(C,H,L,V,D=[],vixHistory=[],maxDays=132){
   if(days<=0) return[];
   const out=[];
   const vixByDate=new Map((vixHistory||[]).filter(x=>x?.date).map(x=>[x.date,+x.value]));
+  /* 高速化の検討メモ(2026-07):
+     「直近300日だけ切り出す」窓固定を試したが、OBV系(calcOBVMomentum/calcOBVDiv)が
+     先頭からの累積値で、しかもZスコアの平均・標準偏差を全履歴で取る実装のため、
+     切り詰めるとスコアが最大3.7pt変わることを実測で確認した。
+     スコアの厳密性を優先し全期間prefixのまま残す。体感速度は
+     「描画後にrequestIdleCallbackで計算する」(scheduleHistory)側で解決している。 */
   for(let i=n-days;i<n;i++){
     const c=C.slice(0,i+1), h=H.slice(0,i+1), l=L.slice(0,i+1), v=V.slice(0,i+1);
     if(c.length<minWindow) continue;
@@ -2730,8 +2928,117 @@ function renderCandlestickChart(seriesData,days=66){
 
 function clamp100(v){return Math.max(0,Math.min(100,Number.isFinite(v)?v:0));}
 
+
+/* ═══════════════════════════════════════════════
+   EDGE — バックテスト実測に基づく補正・確率提示 (2026-07-24)
+   分析レポート v5.0〜v9.0 の結論をアプリに反映する層。
+   スコア本体(Layer1-5)は変更せず、この層で「文脈による信頼度補正」と
+   「基準差方式の上昇確率」を追加する。
+═══════════════════════════════════════════════ */
+const EDGE={
+  // 現在の出来高レジーム(平均出来高比)
+  rvol(V,win=20){
+    if(!V||V.length<win+1) return null;
+    const cur=V[V.length-1];
+    const base=V.slice(-win-1,-1).reduce((a,b)=>a+b,0)/win;
+    if(!base) return null;
+    return cur/base;
+  },
+  // 出来高レジームによるエントリー準備度の補正倍率
+  volumeAdjust(V,market){
+    const cfg=CONFIG.edge.volumeRegime[market==='JP'?'JP':'US'];
+    const rv=this.rvol(V);
+    if(rv==null) return{mult:1,label:null,rvol:null,note:cfg.note};
+    if(rv<=cfg.quietTh)  return{mult:1+cfg.quiet, label:'出来高: 閑散', rvol:rv, note:cfg.note};
+    if(rv>=cfg.heavyTh)  return{mult:1+cfg.heavy, label:'出来高: 急増', rvol:rv, note:cfg.note};
+    return{mult:1, label:'出来高: 通常', rvol:rv, note:cfg.note};
+  },
+  // 静けさの天井(60日視点の警戒ラベル)
+  quietTop(result,sentiment,market){
+    const q=CONFIG.edge.quietTop;
+    const vix=sentiment?.vix?.price;
+    const pcr=sentiment?.pcr?.ratio;
+    const rsi=result?.layer2?.vals?.rsi;
+    const vixTh=market==='JP'?q.vixJP:q.vixUS;
+    const okVix=Number.isFinite(vix)&&vix<=vixTh;
+    const okPcr=Number.isFinite(pcr)?pcr<=q.pcr:null;
+    const okRsi=Number.isFinite(rsi)&&rsi>=q.rsi;
+    const hits=[okVix,okPcr,okRsi].filter(x=>x===true).length;
+    const known=[okVix,okPcr,okRsi].filter(x=>x!==null&&x!==undefined).length;
+    if(hits<2||known<2) return null;
+    return{
+      active:hits>=3, partial:hits===2, hits, ex60:q.ex60,
+      detail:[
+        okVix===true?`恐怖指数 ${vix.toFixed(1)} ≦ ${vixTh}`:null,
+        okPcr===true?`PCR ${pcr.toFixed(2)} ≦ ${q.pcr}`:null,
+        okRsi===true?`RSI ${rsi.toFixed(1)} ≧ ${q.rsi}`:null,
+      ].filter(Boolean),
+      note:q.note,
+    };
+  },
+  // 直近の値動きから該当する実測ファクターを判定
+  detectFactors(result,market,sentiment){
+    const F=CONFIG.edge.factors, mk=market==='JP'?'JP':'US';
+    const S=result.series||{}, C=S.closes||[], H=S.highs||[], L=S.lows||[], V=S.volumes||[];
+    const n=C.length; const hit=[];
+    const add=(k,extra)=>{
+      const f=F[k]; if(!f) return;
+      const v=f[mk]; if(!v||v.d==null) return;
+      hit.push({key:k,label:f.label,delta:v.d,pos:v.pos,n:v.n,ref:f.ref,extra:extra||''});
+    };
+    if(n>=6){
+      const r5=(C[n-1]/C[n-6]-1)*100;
+      if(r5<=-10) add('drop5d10',`実測 ${r5.toFixed(1)}%`);
+      if(r5>=10)  add('surge5d10',`実測 +${r5.toFixed(1)}%`);
+    }
+    if(n>=2){
+      const r1=(C[n-1]/C[n-2]-1)*100;
+      if(r1<=-7) add('drop1d7',`実測 ${r1.toFixed(1)}%`);
+    }
+    if(n>=21){
+      const lo20=Math.min(...L.slice(-21,-1)), hi20=Math.max(...H.slice(-21,-1));
+      if(C[n-1]<lo20) add('low20','');
+      if(C[n-1]>hi20) add('high20','');
+    }
+    if(n>=253){
+      const lo52=Math.min(...L.slice(-253,-1)), hi52=Math.max(...H.slice(-253,-1));
+      if(C[n-1]<lo52) add('low52','');
+      if(C[n-1]>hi52) add('high52','');
+    }
+    const rv=this.rvol(V);
+    if(rv!=null){
+      if(rv>=3)   add('volHeavy',`実測 ${rv.toFixed(1)}倍`);
+      if(rv<=0.7) add('volThin',`実測 ${rv.toFixed(1)}倍`);
+    }
+    const mo=new Date().getMonth()+1;
+    if(mo===9) add('sep','');
+    else if(mo===7||mo===8) add('summer','');
+    else if(mo===12) add('dec','');
+    return hit;
+  },
+  /* 上昇確率(20日)の概算。
+     v8.0 §10-2 B1の勧告どおり「基準からの差」を必ず併記する。
+     要因どうしは相関するため単純加算せず、寄与の大きい順に減衰させて合算する。 */
+  probability(result,market,sentiment){
+    const mk=market==='JP'?'JP':'US';
+    const base=CONFIG.edge.baseUpRate[mk];
+    const hits=this.detectFactors(result,market,sentiment)
+      .sort((a,b)=>Math.abs(b.delta)-Math.abs(a.delta));
+    let delta=0;
+    hits.forEach((h,i)=>{ delta += h.delta*Math.pow(0.6,i); }); // 2番目以降は減衰
+    delta=Math.max(-18,Math.min(18,delta));
+    const p=Math.max(5,Math.min(95,base+delta));
+    const show=Math.abs(delta)>=CONFIG.edge.minShowDelta;
+    return{base,delta:Math.round(delta*10)/10,prob:Math.round(p*10)/10,show,hits,market:mk};
+  },
+  // 保有・出口プラン
+  holdingPlan(market){
+    return CONFIG.edge.holding[market==='JP'?'JP':'US'];
+  },
+};
+
 /* マーケット状態ラベル（総合スコア・レジーム・反転確認・深度を分離して判定） */
-function computeMarketState(result){
+function computeMarketState(result,sentiment){
   const o=result.integration?.allOverall??50;
   const reg=result.layer1?.score??50;
   const confirm=result.layer3?.score??50;
@@ -2748,13 +3055,18 @@ function computeMarketState(result){
   else if(o<85&&confirm>=58){label='天井圏・反転兆候';tone='top';note='過熱に加えて弱気ダイバージェンス等の確認が点灯';}
   else if(o>=85){label='極端な過熱・天井探索';tone='top';note='高過熱。利確・ヘッジ候補だが上昇継続にも注意';}
   else {label='天井圏・上昇継続中';tone='topWatch';note='過熱しているが反転確認は限定的';}
+  /* 静けさの天井(2026-07-24 追加 / v4.1 §1): 恐怖の不在×過熱。
+     20日では効かず60日で-5.5〜-7.8pt。売りではなく利確・新規停止の合図として出す。 */
+  const qt=EDGE.quietTop(result,sentiment,result.info?.market);
+  if(qt&&qt.active&&o>=55){ label='静けさの天井(60日警戒)'; tone='top';
+    note='恐怖指標が低い状態での過熱。60日先の超過が-5.5pt(勝率43%)。利確・新規停止の検討局面'; }
   const palette={
     bottom:{c:'#1D9E75',bg:'rgba(29,158,117,.14)'},bottomWatch:{c:'#5AAA8B',bg:'rgba(29,158,117,.08)'},
     recover:{c:'#3B82D8',bg:'rgba(59,130,216,.12)'},bull:{c:'#3B82D8',bg:'rgba(59,130,216,.12)'},
     bear:{c:'#B07010',bg:'rgba(176,112,16,.12)'},neutral:{c:'#9090b0',bg:'rgba(120,120,160,.10)'},
     topWatch:{c:'#BA7517',bg:'rgba(186,117,23,.12)'},top:{c:'#D85A30',bg:'rgba(216,90,48,.14)'},
   }[tone];
-  return{label,note,color:palette.c,bg:palette.bg,overall:o,regime:reg};
+  return{label,note,color:palette.c,bg:palette.bg,overall:o,regime:reg,quietTop:qt};
 }
 
 /* エントリー準備度（2026-07 バックテスト校正済: しきい値60/50/35/20 + 深度ボーナス）
@@ -2779,7 +3091,14 @@ function computeEntryReadiness(result){
   // 深度ボーナス(2026-07校正): 青天井超過D×0.5(上限+10)。A級パニック時のみ効く
   const depthD=result.depth?.d??0;
   const depthBonus=Math.min(10, 0.5*depthD);
-  score=Math.round(clamp100(score+depthBonus));
+  score=clamp100(score+depthBonus);
+  /* 出来高レジーム補正(2026-07-24 追加 / v6.0 §5・v7.0 §9)
+     逆張りシグナルの信頼度は出来高で変わり、しかも日米で符号が逆。
+     米国=静かな押し目が効く / 日本=投げを伴う底が効く。 */
+  const vadj=EDGE.volumeAdjust(result.series?.volumes,result.info?.market);
+  const beforeVol=score;
+  score=Math.round(clamp100(score*vadj.mult));
+  const volDelta=Math.round((score-beforeVol)*10)/10;
   // しきい値はバックテスト校正済み(6銘柄×32年: ≧60は平均+7.7〜8.0%/勝率88〜93%、50-59は+5.2〜6.9%/76%)
   let label='待機',color='#7878a0',action='条件不足。極端値または反転確認を待つ';
   if(score>=60){label='反転確認済み';color='#1D9E75';action='分割エントリーの最終確認段階（損切り条件を先に設定）';}
@@ -2794,7 +3113,9 @@ function computeEntryReadiness(result){
     {name:'データ自信度',value:Math.round(confidence),weight:10},
   ];
   if(depthBonus>=0.5) parts.push({name:'深度ボーナス',value:Math.round(depthBonus),weight:'+'});
-  return{score,label,color,action,parts,depthBonus:Math.round(depthBonus*10)/10};
+  if(Math.abs(volDelta)>=0.5) parts.push({name:(vadj.label||'出来高補正'),value:volDelta,weight:'×'});
+  return{score,label,color,action,parts,depthBonus:Math.round(depthBonus*10)/10,
+         volAdjust:{...vadj,delta:volDelta}};
 }
 
 function renderResult(result){
@@ -2807,7 +3128,7 @@ function renderResult(result){
     <span style="font-size:24px;font-weight:700;color:var(--t1)">${cur.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
     <span style="color:${pc};font-size:16px;font-weight:600">${fp2(pch,2)}%</span>`;
   document.getElementById('asOf').textContent=`${name} (${symbol}) · ${n}営業日分 · ${mk==='JP'?'日本市場':'米国市場'}`;
-  const ms=computeMarketState(result);
+  const ms=computeMarketState(result,result.__sentiment);
   document.getElementById('marketStatePanel').innerHTML=`<div class="state-card">
     <div class="state-card-head">
       <span style="font-size:11px;color:var(--t2)">マーケット状態</span>
@@ -2960,6 +3281,74 @@ function renderResult(result){
     <div style="font-size:11px;color:var(--t2);margin-top:7px">${er.action}</div>
     <div style="font-size:10px;color:var(--t3);margin-top:4px">目安: ≧60(反転確認済み)は銘柄あたり約10年に1回・過去成績 平均+7.7〜8.0%/勝率88〜93%、50-59(打診候補)は+5.2〜6.9%/勝率76%。判定はしきい値ルールによる自動表示です。</div>
   </div>`;
+  /* ══ EDGE パネル (2026-07-24 追加): 実測に基づく上昇確率・保有プラン・天井警戒 ══ */
+  (function renderEdge(){
+    const el=document.getElementById('edgePanel');
+    if(!el) return;
+    const mkt=result.info?.market||'US';
+    const pr=EDGE.probability(result,mkt,result.__sentiment);
+    const plan=EDGE.holdingPlan(mkt);
+    const qt=ms.quietTop;
+    const va=er.volAdjust||{};
+    const dcol=pr.delta>0?'#1D9E75':pr.delta<0?'#D85A30':'var(--t2)';
+    const probHtml = pr.show
+      ? `<div class="edge-prob" style="color:${dcol}">${pr.prob.toFixed(0)}<span style="font-size:14px">%</span></div>
+         <div class="edge-base">平常時 ${pr.base}% に対し <b style="color:${dcol}">${pr.delta>0?'+':''}${pr.delta}pt</b></div>`
+      : `<div class="edge-prob" style="color:var(--t2);font-size:19px">方向感なし</div>
+         <div class="edge-base">平常時 ${pr.base}% から±${CONFIG.edge.minShowDelta}pt以内のため数値を出しません</div>`;
+    const rows=pr.hits.length
+      ? pr.hits.map(h=>{
+          const c=h.delta>0?'#1D9E75':'#D85A30';
+          const weak=h.n<CONFIG.edge.minSamples?`<span class="edge-tag" style="color:#BA7517;background:rgba(186,117,23,.15)">参考</span>`:'';
+          return `<div class="edge-row"><span>${h.label}${h.extra?` <span style="color:var(--t3)">${h.extra}</span>`:''}${weak}</span>
+                  <span style="color:${c};font-family:var(--mono);white-space:nowrap">${h.delta>0?'+':''}${h.delta}pt</span></div>`;
+        }).join('')
+      : `<div class="edge-row" style="color:var(--t3)">該当する実測ファクターなし</div>`;
+    const detail = pr.hits.length ? `
+      <details class="edge-det"><summary>根拠の内訳を見る（実測値・該当銘柄数・出典）</summary>
+        <table><thead><tr><th>要因</th><th>基準差</th><th>陽性率</th><th>銘柄数</th><th>出典</th></tr></thead><tbody>
+        ${pr.hits.map(h=>`<tr><td>${h.label}</td>
+          <td style="font-family:var(--mono);color:${h.delta>0?'#1D9E75':'#D85A30'}">${h.delta>0?'+':''}${h.delta}pt</td>
+          <td>${h.pos!=null?(h.pos*100).toFixed(0)+'%':'—'}</td><td>${h.n}</td><td style="color:var(--t3)">${h.ref}</td></tr>`).join('')}
+        </tbody></table>
+        <p style="font-size:10px;color:var(--t3);margin-top:6px;line-height:1.5">
+        「基準差」は各要因が成立した日の20日先上昇率が、その市場の平常時から何ポイントずれたかの実測中央値。
+        「陽性率」は超過リターンがプラスだった銘柄の割合(0.5なら方向性なし)。
+        要因どうしは相関するため、合算時は寄与の大きい順に0.6倍ずつ減衰させています(単純加算はしません)。
+        これは統計的な傾向であり、個別の予測ではありません。</p>
+      </details>` : '';
+    const volHtml = va.label ? `
+      <div class="edge-row"><span>${va.label}${va.rvol?` <span style="color:var(--t3)">${va.rvol.toFixed(2)}倍</span>`:''}</span>
+      <span style="font-family:var(--mono);color:${(va.delta||0)>0?'#1D9E75':(va.delta||0)<0?'#D85A30':'var(--t2)'}">
+      準備度 ${(va.delta||0)>0?'+':''}${va.delta||0}</span></div>
+      <p style="font-size:10px;color:var(--t3);margin-top:3px;line-height:1.5">${va.note||''}</p>` : '';
+    const qtHtml = (qt&&(qt.active||qt.partial)) ? `
+      <div class="edge-warn">
+        <b>${qt.active?'静けさの天井（60日視点）':'静けさの天井 — 条件2/3'}</b><br>
+        ${qt.detail.join(' ／ ')}<br>
+        <span style="color:var(--t2)">60日先の超過リターン ${qt.ex60}pt・勝率43%（実測）。${qt.note}</span>
+      </div>` : '';
+    el.innerHTML=`<div class="edge-card">
+      <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">
+        <div style="min-width:140px">
+          <div style="font-size:11px;color:var(--t2)">20日先の上昇確率（概算）</div>
+          ${probHtml}
+        </div>
+        <div style="flex:1;min-width:190px">${rows}${volHtml}</div>
+      </div>
+      ${qtHtml}
+      <div style="margin-top:9px;padding-top:8px;border-top:.5px solid var(--bd)">
+        <div style="font-size:11px;color:var(--t2)">想定保有期間（${mkt==='JP'?'日本株':'米国株'}の実測に基づく）</div>
+        <div style="font-size:13px;color:var(--t1);margin-top:2px">
+          <b>${plan.days}</b>${plan.takeProfit?` ／ 利確目安 <b>${plan.takeProfit}</b>`:' ／ 早い利確は不利'}
+        </div>
+        <p style="font-size:10.5px;color:var(--t3);margin-top:4px;line-height:1.55">${plan.note}</p>
+        <p style="font-size:10.5px;color:var(--t3);margin-top:4px;line-height:1.55">${CONFIG.edge.holding.stopNote}</p>
+      </div>
+      ${detail}
+    </div>`;
+  })();
+
   const bdRow=(label,b,t,o,strong)=>`<tr${strong?' style="background:var(--bg3)"':''}>
     <td style="text-align:left;${strong?'font-weight:600':''}">${label}</td>
     <td style="color:#1D9E75;font-family:'Courier New',monospace">${b==null?'—':b.toFixed(1)}</td>
@@ -3029,7 +3418,7 @@ function generateReport(result){
   t+='  ファンダ    : 大底 '+(IG.fundBottom==null?'—':IG.fundBottom.toFixed(1))+' / 天井 '+(IG.fundTop==null?'—':IG.fundTop.toFixed(1))+' / 総合 '+(IG.fundOverall==null?'—':IG.fundOverall.toFixed(1))+'\n';
   t+='  全総合      : 大底 '+IG.allBottom.toFixed(1)+' / 天井 '+IG.allTop.toFixed(1)+' / 総合 '+IG.allOverall.toFixed(1)+' (合算比 底70:30/天井55:45)\n';
   t+='  行動ゾーン  : 買い≦'+CONFIG.zones.buy+' / 利確≧'+CONFIG.zones.exit+' ｜ 初日は1/3打診の分割エントリー推奨\n';
-  const MS=computeMarketState(result),ER=computeEntryReadiness(result);
+  const MS=computeMarketState(result,result.__sentiment),ER=computeEntryReadiness(result);
   t+='  市場状態    : '+MS.label+' — '+MS.note+'\n';
   t+='  エントリー準備度: '+ER.score+'/100 ('+ER.label+') — '+ER.action+'\n';
   const DP=result.depth;
@@ -3142,6 +3531,31 @@ async function runFundOnly(){
   finally{ document.getElementById('dLoad').style.display='none'; }
 }
 
+/* 履歴スコア計算は重い(数百ms〜数秒)。描画をブロックしないよう次のフレームに回す。
+   同じ銘柄・同じ最終日なら再計算しない。 */
+const _histMemo=new Map();
+function scheduleHistory(key,data,sentiment,days){
+  const last=data.dates?.[data.dates.length-1]||'';
+  const memoKey=key+'|'+last+'|'+data.closes.length;
+  if(_histMemo.has(memoKey)){
+    const h=_histMemo.get(memoKey);
+    const c=dataCache.get(key); if(c) c.historical=h;
+    renderHistoryChart(h,days); return;
+  }
+  const run2=()=>{
+    try{
+      const h=computeHistoricalScores(data.closes,data.highs,data.lows,data.volumes,
+                                      data.dates,sentiment?.vix?.history,132);
+      _histMemo.set(memoKey,h);
+      if(_histMemo.size>40) _histMemo.delete(_histMemo.keys().next().value);
+      const c=dataCache.get(key); if(c) c.historical=h;
+      renderHistoryChart(h,days);
+    }catch(e){ console.warn('履歴計算に失敗:',e.message); }
+  };
+  if(typeof requestIdleCallback==='function') requestIdleCallback(run2,{timeout:1200});
+  else setTimeout(run2,0);
+}
+
 async function run(force){
   ['dResult','dErr'].forEach(id=>document.getElementById(id).style.display='none');
   const sym=getCurSym(), key=cacheKeyFor(src,sym);
@@ -3176,9 +3590,12 @@ async function run(force){
     updateFavBtn(); return;
   }
 
-  // ─ Step 2: localStorage永続キャッシュ (前回セッションの株価) ─
-  const pcI=await PriceCache.info(src,sym);
-  if(!force && pcI && !pcI.stale){
+  // ─ Step 2: 永続キャッシュ (鮮度チェック付き) ─
+  const _mkt=detectMarket(src==='yahoo'?sym.y:sym.a);
+  const pcI=await PriceCache.info(src,sym,_mkt);
+  // 鮮度切れ or 暫定終値(ザラ場中に保存したもの)なら差分取得を行う
+  let _needDelta = !!(pcI && !pcI.stale && (pcI.outdated || pcI.provisional));
+  if(!force && pcI && !pcI.stale && !_needDelta){
     const pc=await PriceCache.load(src,sym);
     if(pc?.closes?.length>=55){
       document.getElementById('dLoad').style.display='';
@@ -3197,21 +3614,64 @@ async function run(force){
         }
         const data=clean(raw);
         const result=analyse(data,sentiment,market,fa);
-        const historical=computeHistoricalScores(data.closes,data.highs,data.lows,data.volumes,data.dates,sentiment.vix?.history,132);
+        const historical=[];
         dataCache.set(key,{raw,sentiment,market,fundAuto:fa,result,historical,fetchedAt:pc.at});
         _lastResult=result;
         const d=src==='yahoo'?sym.y:(sym.a||sym.y);
         document.getElementById('mainTitle').textContent=
           (sym.name&&sym.name!==d?sym.name+' ':'')+d+' テクニカルスコア';
-        renderResult(result); renderHistoryChart(historical,histRangeDays);
+        renderResult(result);
+        scheduleHistory(key,data,sentiment,histRangeDays);
         await syncFavorite(result);
         if(wasManual) saveSearchHistory(manualCode,src,result.info?.name);
         updateFavBtn();
-        console.log('📦 永続キャッシュから復元:',pcI.days+'日分');
+        console.log('📦 永続キャッシュから復元:',pcI.days+'日分 / 最終日',pcI.lastDate);
       }catch(e){console.warn('キャッシュ復元失敗:',e.message); force=true;}
       finally{document.getElementById('dLoad').style.display='none';}
       if(!force) return;
     }
+  }
+
+  /* ─ Step 2.5: 差分取得(2026-07 追加) ────────────────────────────
+     キャッシュはあるが最新取引日に達していない場合、2年分を取り直さず
+     直近3か月だけ取得して結合する。転送量が約1/8になり体感が大きく変わる。 */
+  if(!force && _needDelta && src==='yahoo'){
+    document.getElementById('dLoad').style.display='';
+    try{
+      const pc=await PriceCache.load(src,sym);
+      const delta=await fetchYahooDelta(sym.y);
+      const merged=mergeSeries(pc,delta);
+      if(merged?.closes?.length>=55){
+        await PriceCache.save(src,sym,merged);
+        const market=_mkt;
+        const fa=FundPersist.getAuto()||_fundAuto;
+        const sm=FundPersist.getManual(); if(sm) applyManualToDOM(sm);
+        saveFundManual();
+        const sentiment=await fetchSentiment(market).catch(()=>({market}));
+        if(!sentiment.pcr && _fundJson?.indicators?.pcr){
+          sentiment.pcr={ratio:_fundJson.indicators.pcr.value};
+        }
+        const data=clean(merged);
+        const result=analyse(data,sentiment,market,fa);
+        const d3=sym.y;
+        document.getElementById('mainTitle').textContent=
+          (sym.name&&sym.name!==d3?sym.name+' ':'')+d3+' テクニカルスコア';
+        renderResult(result);
+        dataCache.set(key,{raw:merged,sentiment,market,fundAuto:fa,result,historical:[],fetchedAt:Date.now()});
+        _lastResult=result;
+        await syncFavorite(result);
+        if(wasManual) saveSearchHistory(manualCode,src,result.info?.name);
+        updateFavBtn();
+        // 重い履歴計算は描画後に回して初期表示を速くする
+        scheduleHistory(key,data,sentiment,histRangeDays);
+        console.log('⚡ 差分取得で更新:',pcI.lastDate,'→',merged.dates[merged.dates.length-1]);
+        document.getElementById('dLoad').style.display='none';
+        return;
+      }
+    }catch(e){
+      console.warn('差分取得に失敗、全期間取得へ切替:',e.message);
+    }
+    document.getElementById('dLoad').style.display='none';
   }
 
   // ─ Step 3: ネットワーク取得 (株価+センチメント。ファンダは24h以上古い場合のみ) ─
@@ -3249,10 +3709,10 @@ async function run(force){
       (sym.name&&sym.name!==d2?sym.name+' ':'')+d2+' テクニカルスコア';
     const data=clean(raw);
     const result=analyse(data,sentiment,market,fa);
-    const historical=computeHistoricalScores(data.closes,data.highs,data.lows,data.volumes,data.dates,sentiment.vix?.history,132);
-    dataCache.set(key,{raw,sentiment,market,fundAuto:fa,result,historical,fetchedAt:Date.now()});
+    dataCache.set(key,{raw,sentiment,market,fundAuto:fa,result,historical:[],fetchedAt:Date.now()});
     _lastResult=result;
-    renderResult(result); renderHistoryChart(historical,histRangeDays);
+    renderResult(result);
+    scheduleHistory(key,data,sentiment,histRangeDays);
     await syncFavorite(result);
     if(wasManual) saveSearchHistory(manualCode,src,result.info?.name);
     updateFavBtn();
