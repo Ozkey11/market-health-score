@@ -85,6 +85,22 @@ SOURCES = {
         "label": "日経レバ1570 信用残",
         "links": [{"name": "Yahoo Finance JP", "url": "https://finance.yahoo.co.jp/quote/1570.T/history?styl=margin&page=1"}],
     },
+    # 2026-07-25 追加 (作業3)
+    "supply:us_short_volume": {
+        "label": "米国 空売り出来高 (FINRA日次)",
+        "links": [
+            {"name": "FINRA RegSHO 日次ファイル", "url": "https://cdn.finra.org/equity/regsho/daily/"},
+            {"name": "FINRA 短期売買データ 説明", "url": "https://www.finra.org/finra-data/browse-catalog/short-sale-volume-data"},
+        ],
+    },
+    "supply:jp_margin": {
+        "label": "日本 信用取引残高 (JPX)",
+        "links": [
+            {"name": "銘柄別信用取引週末残高 (〜2026/9)", "url": "https://www.jpx.co.jp/markets/statistics-equities/margin/05.html"},
+            {"name": "個別銘柄信用取引残高表", "url": "https://www.jpx.co.jp/markets/statistics-equities/margin/index.html"},
+            {"name": "公表スケジュール", "url": "https://www.jpx.co.jp/markets/statistics-equities/margin/07.html"},
+        ],
+    },
     # ── ファンダメンタルズ・マクロ ─────────────────────────────
     "fundamental:shiller_per": {
         "label": "S&P500シラーPER",

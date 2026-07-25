@@ -86,6 +86,24 @@ CREATE TABLE IF NOT EXISTS supply_demand_daily (
     PRIMARY KEY (market, date, metric_name)
 );
 
+/* 銘柄別の需給データ (2026-07-25 追加 / 作業3)
+   supply_demand_daily は市場全体の指標用で銘柄の軸を持たないため、
+   米国の空売り出来高・日本の信用残のような「銘柄ごと」のデータ用に別テーブルを設ける。
+   date は対象日(申込日)、release_date は公表日。
+   信用残は2営業日、ショートインタレストは約8営業日遅れて公表されるため、
+   両者を分けて持たないと、参照時に未来の情報を使ってしまう。 */
+CREATE TABLE IF NOT EXISTS supply_symbol_daily (
+    symbol       TEXT NOT NULL,    -- Yahoo形式 (例: NVDA / 7203.T)
+    date         TEXT NOT NULL,    -- 対象日
+    metric_name  TEXT NOT NULL,    -- 'short_volume_ratio' / 'margin_long' / 'margin_short' 等
+    value        REAL,
+    release_date TEXT,             -- 公表日 (PIT整合性のため)
+    source       TEXT,
+    updated_at   TEXT,
+    PRIMARY KEY (symbol, date, metric_name)
+);
+CREATE INDEX IF NOT EXISTS idx_supply_symbol_date ON supply_symbol_daily(date);
+
 CREATE TABLE IF NOT EXISTS features_daily (
     symbol       TEXT NOT NULL,
     date         TEXT NOT NULL,
@@ -195,6 +213,34 @@ def upsert_fundamental_latest(conn, symbol, metric, value, as_of_date, source, i
         """INSERT OR REPLACE INTO fundamental_history(symbol,metric_name,date,value,source,updated_at)
            VALUES(?,?,?,?,?,?)""",
         (symbol, metric, as_of_date, value, source, now_iso()),
+    )
+
+
+def upsert_supply_symbol(conn, symbol, date, metric, value, source, release_date=None):
+    """銘柄別の需給データを1件登録する (2026-07-25 追加 / 作業3)。
+
+    date は対象日、release_date は公表日。
+    信用残は2営業日、ショートインタレストは約8営業日遅れて公表されるため、
+    両者を分けて保持しないと参照時に未来の情報を使ってしまう。
+    """
+    conn.execute(
+        """INSERT INTO supply_symbol_daily(symbol,date,metric_name,value,release_date,source,updated_at)
+           VALUES(?,?,?,?,?,?,?)
+           ON CONFLICT(symbol,date,metric_name) DO UPDATE SET
+             value=excluded.value, release_date=excluded.release_date,
+             source=excluded.source, updated_at=excluded.updated_at""",
+        (symbol, date, metric, value, release_date, source, now_iso()),
+    )
+
+
+def upsert_supply(conn, market, date, metric, value, source):
+    """市場全体の需給データ(空売り比率・騰落レシオ等)を1件登録する。"""
+    conn.execute(
+        """INSERT INTO supply_demand_daily(market,date,metric_name,value,source,updated_at)
+           VALUES(?,?,?,?,?,?)
+           ON CONFLICT(market,date,metric_name) DO UPDATE SET
+             value=excluded.value, source=excluded.source, updated_at=excluded.updated_at""",
+        (market, date, metric, value, source, now_iso()),
     )
 
 

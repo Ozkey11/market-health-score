@@ -159,6 +159,35 @@ def build_history(conn, symbols=("^GSPC", "SPY", "^N225", "QQQ", "IWM", "SOXL", 
     return out
 
 
+def build_supply(conn, days=400):
+    """需給データを配信用JSONへ (2026-07-25 追加 / 作業3)。
+
+    アプリ側は銘柄コードをキーに参照する。
+    date=対象日、release=公表日。公表日を持たせているのは、
+    「その日時点で実際に見られた情報か」をアプリ側で判定できるようにするため。
+    """
+    obj = {"updated_at": _now(), "metrics": {}, "symbols": {}}
+    metrics = conn.execute(
+        "SELECT DISTINCT metric_name FROM supply_symbol_daily ORDER BY metric_name"
+    ).fetchall()
+    obj["metrics"] = [m[0] for m in metrics]
+
+    rows = conn.execute(
+        """SELECT symbol, date, metric_name, value, release_date, source
+           FROM supply_symbol_daily
+           WHERE date >= date('now', ?)
+           ORDER BY symbol, date""",
+        (f"-{days} days",),
+    ).fetchall()
+    for sym, d, metric, val, rel, src in rows:
+        s = obj["symbols"].setdefault(sym, {})
+        s.setdefault(metric, []).append({"date": d, "value": val, "release": rel})
+    obj["symbol_count"] = len(obj["symbols"])
+    obj["row_count"] = len(rows)
+    _write("supply.json", obj)
+    return obj
+
+
 def build_data_quality(conn, run_id):
     ql = conn.execute(
         """SELECT item, status, message, source_link, occurred_at

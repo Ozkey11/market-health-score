@@ -8,7 +8,8 @@ batch/main.py — GitHub Actions から呼ばれる統合バッチ
   Step 2  マクロ       fetch_macro.fetch_all_macro         -> SQLite macro_series
   Step 3  センチメント fetch_sentiment.fetch_all_sentiment -> SQLite sentiment_daily
   Step 4  ファンダ     fetch_fundamentals.run_fetch        -> data/fundamentals.json
-  Step 5  配信JSON生成 build_json.*                        -> data/*.json
+  Step 5  需給         fetch_supply_us / fetch_supply_jp   -> SQLite supply_symbol_daily
+  Step 6  配信JSON生成 build_json.*                        -> data/*.json
 
 --------------------------------------------------------------------
 2026-07-25 改修（作業1）
@@ -30,7 +31,7 @@ batch/main.py — GitHub Actions から呼ばれる統合バッチ
   py batch\main.py                  ... 全ステップ
   py batch\main.py prices           ... 価格だけ
   py batch\main.py macro sentiment  ... 複数指定も可
-  （指定できる名前: prices / macro / sentiment / fundamentals / json）
+  （指定できる名前: prices / macro / sentiment / fundamentals / supply / json）
 """
 import os
 import sys
@@ -40,7 +41,7 @@ import traceback
 # batch/ ディレクトリをパスに追加（どこから実行してもimportできるように）
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-STEP_NAMES = ["prices", "macro", "sentiment", "fundamentals", "json"]
+STEP_NAMES = ["prices", "macro", "sentiment", "fundamentals", "supply", "json"]
 
 
 def _hr(title):
@@ -152,21 +153,51 @@ def main():
     else:
         skipped.append("fundamentals")
 
-    # ── Step 5: 配信用JSONの生成 ──
+    # ── Step 5: 需給データ (2026-07-25 追加 / 作業3) ──
+    # 米国=FINRA日次空売り出来高、日本=JPX信用取引残高。いずれも無料・APIキー不要。
+    if "supply" in targets:
+        def _supply():
+            ok = ng = 0
+            try:
+                from fetch_supply_us import fetch_all_supply_us
+                print("  [米国] FINRA 空売り出来高")
+                a, b = fetch_all_supply_us(conn, run_id)
+                ok += a; ng += b
+            except Exception as e:
+                print("  [米国] 失敗: {}: {}".format(type(e).__name__, e))
+                traceback.print_exc()
+                ng += 1
+            try:
+                from fetch_supply_jp import fetch_all_supply_jp
+                print("  [日本] JPX 信用取引残高")
+                a, b = fetch_all_supply_jp(conn, run_id)
+                ok += a; ng += b
+            except Exception as e:
+                print("  [日本] 失敗: {}: {}".format(type(e).__name__, e))
+                traceback.print_exc()
+                ng += 1
+            return ok, ng
+        run_step(5, "supply", "需給データの取得（FINRA空売り出来高・JPX信用残）",
+                 _supply, counters, errors)
+    else:
+        skipped.append("supply")
+
+    # ── Step 6: 配信用JSONの生成 ──
     json_ok = False
     finished_at = now_iso()
     if "json" in targets:
-        _hr("Step 5: 配信用JSONの生成")
+        _hr("Step 6: 配信用JSONの生成")
         finished_at = now_iso()
         try:
             import build_json as bj
             bj.build_latest(conn, run_id)          # data/latest.json
             bj.build_history(conn)                 # data/history_1y.json
             bj.build_data_quality(conn, run_id)    # data/data_quality.json
+            bj.build_supply(conn)                  # data/supply.json
             bj.build_sources_json()                # data/sources.json
             bj.build_api_status(run_id, started_at, finished_at, counters)  # data/api_status.json
             json_ok = True
-            print("  -> 配信JSONを5件生成しました")
+            print("  -> 配信JSONを6件生成しました")
         except Exception as e:
             errors.append("json: {}: {}".format(type(e).__name__, e))
             print("  [NG] 配信JSONの生成に失敗: {}: {}".format(type(e).__name__, e))
@@ -175,7 +206,7 @@ def main():
         skipped.append("json")
 
     # ── 実行記録 ──
-    fetch_keys = [k for k in ("prices", "macro", "sentiment", "fundamentals") if k in counters]
+    fetch_keys = [k for k in ("prices", "macro", "sentiment", "fundamentals", "supply") if k in counters]
     any_ok = any(counters[k].get("ok", 0) > 0 for k in fetch_keys)
     if not errors and not skipped:
         status = "ok"
