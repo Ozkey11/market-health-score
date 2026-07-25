@@ -753,9 +753,14 @@ const CONFIG={
   // 将来のプライスアクション追加時はここにキーを追加し、
   // CONFIRMATION_PLUGINSのenabledをtrueにする
   layer3Weights:{
-    macdDiv:0.30, rsiDiv:0.30, mfiDiv:0.20, obvDiv:0.20,
-    // 将来追加用（有効化時は合計1.0になるよう再配分）
-    // pinbar:0.00, engulfing:0.00, fakeout:0.00, failedBreak:0.00,
+    // 2026-07-25(作業2): パターン2種を追加したため、既存4種を0.8倍して再配分。
+    // 4種の相対比(30:30:20:20)は維持している。
+    //   旧: macdDiv:0.30, rsiDiv:0.30, mfiDiv:0.20, obvDiv:0.20 = 1.00
+    macdDiv:0.24, rsiDiv:0.24, mfiDiv:0.16, obvDiv:0.16,
+    // パターン系は合計0.20。ローソク足を厚めにしているのは、
+    // チャートパターンの方が検出定義の揺れが大きく、バックテスト側の
+    // 検出器と完全には一致しないため(下記の注意点を参照)。
+    candlePat:0.12, chartPat:0.08,
   },
 
   /* ══════════════════════════════════════════════════════════
@@ -805,6 +810,59 @@ const CONFIG={
       JP:{days:'5〜20日', takeProfit:'+15〜20%',
           note:'日本株は5日で20日ぶんの92%に到達し、その後は横ばい〜減衰。+15%利確で+2.95→+4.74'},
       stopNote:'価格ベースの損切りは日米ともすべての水準で成績を悪化させた(逆行の中央値が-9%あるため必ず刈られる)。退出は「シグナル失効(深度Dの縮小・レジーム転換)」で判断する',
+    },
+  },
+
+  /* ══════════════════════════════════════════════════════════
+     PATTERNS: ローソク足・チャートパターン (2026-07-25 追加 / 作業2)
+     分析レポート v8.0 第8-9章の実測値。米国株37銘柄(1999-2026)・
+     日本株29銘柄(2000-2026)における「20日先の超過リターン(%pt)」の中央値。
+
+     重要: 一律の「逆神」ではない。実測を見ると規則性があり、
+       ・実体が大きい勢い系(丸坊主・赤三兵・三羽烏・フラッグ)は【逆神】
+         → 教科書の弱気が買い、教科書の強気が売りになる
+       ・実体が小さい反転系(はらみ・毛抜き・逆ハンマー・首吊り)は【教科書どおり】
+     そこで一律反転はせず、パターンごとに実測の符号をそのまま使う。
+
+     値の意味: 正 = その後上がった = 買い方向(Layer3を底寄りに動かす)
+               負 = その後下がった = 売り方向(Layer3を天井寄りに動かす)
+               0  = そのマーケットでは方向性なしと判定され不採用
+     不採用の基準: |超過| < 0.12pt、または陽性率が0.45〜0.55の無方向帯、
+                   または平均と陽性率の符号が矛盾するもの
+     ══════════════════════════════════════════════════════════ */
+  patterns:{
+    enabled:true,          // falseにすると検出も加点も止まる(既存スコアに完全復帰)
+    deadband:0.15,         // 検出パターンの合計|超過|がこれ未満なら「方向なし」
+    cap:1.2,               // strength=1 とみなす合計超過。これ以上は頭打ち
+    recentBars:5,          // チャートパターンは「直近5本以内に成立」を有効とみなす
+    cdl:{
+      marubozu_bear:         {jp:'陰の丸坊主', book:'弱気', US: 0.71, JP: 0.28},
+      marubozu_bull:         {jp:'陽の丸坊主', book:'強気', US:-0.83, JP:-0.66},
+      three_black_crows:     {jp:'三羽烏', book:'弱気', US: 0.39, JP: 0.68},
+      three_white_soldiers:  {jp:'赤三兵', book:'強気', US:-0.56, JP:  0.0},
+      hanging_man:           {jp:'首吊り線', book:'弱気', US:-0.48, JP:-0.47},
+      inverted_hammer:       {jp:'逆ハンマー', book:'強気', US: 0.57, JP: 0.82},
+      shooting_star:         {jp:'流れ星', book:'弱気', US: -0.2, JP:-0.44},
+      bull_harami:           {jp:'強気のはらみ線', book:'強気', US: 0.53, JP: 0.24},
+      bear_harami:           {jp:'弱気のはらみ線', book:'弱気', US:-0.35, JP:-0.28},
+      tweezer_top:           {jp:'毛抜き天井', book:'弱気', US: -0.3, JP:  0.0},
+      tweezer_bottom:        {jp:'毛抜き底', book:'強気', US: 0.17, JP:  0.0},
+      gravestone_doji:       {jp:'塔婆十字', book:'弱気', US: 0.53, JP:-0.16},
+      dragonfly_doji:        {jp:'トンボ十字', book:'強気', US:  0.0, JP:-0.58},
+      belt_hold_bear:        {jp:'陰の寄付坊主', book:'弱気', US:-0.25, JP:  0.0},
+    },
+    cp:{
+      bear_flag:             {jp:'下降フラッグ', book:'弱気', US: 1.32, JP: 1.38},
+      bull_flag:             {jp:'上昇フラッグ', book:'強気', US:  0.0, JP:-0.82},
+      bear_pennant:          {jp:'下降ペナント', book:'弱気', US:  0.0, JP: 2.44},
+      bull_pennant:          {jp:'上昇ペナント', book:'強気', US:-1.77, JP:-0.73},
+      ascending_triangle:    {jp:'上昇三角持ち合い', book:'強気', US:-0.95, JP:-0.73},
+      descending_triangle:   {jp:'下降三角持ち合い', book:'弱気', US:  0.3, JP:  0.0},
+      symmetrical_triangle:  {jp:'対称三角持ち合い', book:'中立', US:  0.3, JP:  0.0},
+      double_top:            {jp:'ダブルトップ', book:'弱気', US: 0.48, JP:  0.0},
+      double_bottom:         {jp:'ダブルボトム', book:'強気', US:-0.29, JP:  0.0},
+      v_top:                 {jp:'V字トップ', book:'弱気', US: 1.06, JP:  0.0},
+      v_bottom:              {jp:'V字ボトム', book:'強気', US: 0.79, JP:  0.0},
     },
   },
 
@@ -2234,6 +2292,257 @@ function calcMFIDiv(H,L,C,V,p=14,lb=25){
   return{type:'none',note:pN>0?'方向一致↑':'方向一致↓',cur};
 }
 
+
+/* ═══════════════════════════════════════════════
+   PATTERNS — ローソク足・チャートパターンの検出 (2026-07-25 追加 / 作業2)
+
+   外部APIを一切必要とせず、OHLCだけで計算できる。
+   分析レポート v8.0 で最も効果が大きかった発見をアプリへ反映するための層。
+
+   【注意】検出の定義について
+   ここでの検出ロジックは一般的な定義に基づく実装であり、
+   バックテスト側(Python)の検出器と完全に同一ではない。
+   とくにチャートパターン(フラッグ・三角持ち合い等)は定義の揺れが大きいため、
+   CONFIG.layer3Weights では chartPat を candlePat より低い重みにしている。
+   実測値はあくまで「その種類のパターンが出たときの傾向」として使うこと。
+═══════════════════════════════════════════════ */
+const PAT={
+  // ── 共通ヘルパ ──
+  _body(o,c){return Math.abs(c-o);},
+  _range(h,l){return Math.max(h-l,1e-12);},
+  // 直近win本の騰落率(%)。ハンマーと首吊り線のように「同じ形だが文脈で意味が違う」ものの判定に使う
+  _trend(C,i,win){
+    const a=i-win;
+    if(a<0) return 0;
+    const p0=C[a];
+    return p0? (C[i]/p0-1)*100 : 0;
+  },
+  /* 銘柄自身のボラティリティに基づく値幅しきい値(%)。
+     固定%を使うと、値動きの小さい指数ETFでは全く成立せず、
+     値動きの大きい個別株では出っぱなしになるため。
+     bars: 何本ぶんの変動を見るか / k: 係数 / floor: 下限% */
+  _volTh(C,bars,k,floor){
+    const sd=this._sigma(C);
+    return sd==null?floor:Math.max(floor, k*sd*Math.sqrt(bars)*100);
+  },
+  /* 直近60本の日次変化率から、外れ値に強い標準偏差(MAD基準)を求める。
+     単純な標準偏差だと株式分割の1日で壊れる。
+     例: NTT(9432)の25分割では 4405円→171円 となり、
+         単純σ=11.53% に対して MAD基準σ=0.94% と実態に一致する。
+     アプリはYahooの調整前OHLCを使うため、この対策は必須。 */
+  _sigma(C){
+    const n=C.length, from=Math.max(1,n-60), r=[];
+    for(let i=from;i<n;i++){ if(C[i-1]>0) r.push(C[i]/C[i-1]-1); }
+    if(r.length<10) return null;
+    const med=a=>{const b=a.slice().sort((x,y)=>x-y);const m=b.length>>1;
+                  return b.length%2?b[m]:(b[m-1]+b[m])/2;};
+    const m=med(r);
+    const mad=med(r.map(x=>Math.abs(x-m)));
+    return mad>0 ? mad*1.4826 : null;
+  },
+  // ピボット(フラクタル)検出。前後k本より高い/低い点を転換点とみなす
+  _pivots(H,L,k,win){
+    const n=H.length, from=Math.max(k, n-win), hi=[], lo=[];
+    for(let i=from;i<n-k;i++){
+      let isH=true, isL=true;
+      for(let j=1;j<=k;j++){
+        if(H[i]<=H[i-j]||H[i]<=H[i+j]) isH=false;
+        if(L[i]>=L[i-j]||L[i]>=L[i+j]) isL=false;
+        if(!isH&&!isL) break;
+      }
+      if(isH) hi.push({i,v:H[i]});
+      if(isL) lo.push({i,v:L[i]});
+    }
+    return{hi,lo};
+  },
+
+  /* ── ローソク足パターン ──────────────────────────
+     最新の1本(と直前数本)だけを見る。戻り値は検出したIDの配列。 */
+  candles(O,H,L,C){
+    const n=C.length;
+    if(!O||O.length!==n||n<5) return [];
+    const i=n-1, o=O[i], h=H[i], l=L[i], c=C[i];
+    if(![o,h,l,c].every(Number.isFinite)) return [];
+    const rng=this._range(h,l), body=this._body(o,c), bodyR=body/rng;
+    const up=c>o, dn=c<o;
+    const upper=(h-Math.max(o,c))/rng, lower=(Math.min(o,c)-l)/rng;
+    const tr=this._trend(C,i,10);          // 直近10本の地合い
+    const out=[];
+    const at=k=>({o:O[i-k],h:H[i-k],l:L[i-k],c:C[i-k]});
+
+    // 丸坊主（実体が全体の9割以上＝ヒゲがほぼ無い）
+    if(bodyR>=0.93&&up) out.push('marubozu_bull');
+    if(bodyR>=0.93&&dn) out.push('marubozu_bear');
+
+    // 十字線系（実体が全体の1割以下）
+    if(bodyR<=0.10){
+      if(lower>=0.60&&upper<=0.10) out.push('dragonfly_doji');
+      if(upper>=0.60&&lower<=0.10) out.push('gravestone_doji');
+    }
+
+    // ハンマー型（下ヒゲが長い）／逆ハンマー型（上ヒゲが長い）
+    // 同じ形でも、下落局面ならハンマー・上昇局面なら首吊り線と呼び分ける
+    if(bodyR<=0.40&&lower>=0.45&&upper<=0.20){
+      if(tr>=1.5) out.push('hanging_man');
+    }
+    if(bodyR<=0.40&&upper>=0.45&&lower<=0.20){
+      if(tr<=-1.5) out.push('inverted_hammer');
+      else if(tr>=1.5) out.push('shooting_star');
+    }
+
+    if(n>=2){
+      const p=at(1);
+      if([p.o,p.h,p.l,p.c].every(Number.isFinite)){
+        const pBody=this._body(p.o,p.c), pRng=this._range(p.h,p.l);
+        // はらみ線（前日の実体の中に今日の実体が収まる）
+        const inside=Math.max(o,c)<=Math.max(p.o,p.c)&&Math.min(o,c)>=Math.min(p.o,p.c);
+        if(inside&&pBody/pRng>=0.70&&body<pBody*0.35&&bodyR<=0.40){
+          if(p.c<p.o&&up) out.push('bull_harami');
+          if(p.c>p.o&&dn) out.push('bear_harami');
+        }
+        // 毛抜き（2本の安値/高値がほぼ同値）
+        if(Math.abs(l-p.l)/Math.max(p.l,1e-9)<=0.001&&tr<=-3) out.push('tweezer_bottom');
+        if(Math.abs(h-p.h)/Math.max(p.h,1e-9)<=0.001&&tr>=3) out.push('tweezer_top');
+        // 陰の寄付坊主（寄付きが高値＝上ヒゲが無い陰線）
+        if(dn&&(h-o)/rng<=0.015&&bodyR>=0.78) out.push('belt_hold_bear');
+      }
+    }
+
+    // 赤三兵／三羽烏（実体の大きい同方向3本）
+    if(n>=3){
+      const a=at(2), b=at(1);
+      if([a.o,a.h,a.l,a.c,b.o,b.h,b.l,b.c].every(Number.isFinite)){
+        const big=[this._body(a.o,a.c)/this._range(a.h,a.l),
+                   this._body(b.o,b.c)/this._range(b.h,b.l), bodyR].every(x=>x>=0.55);
+        // 値幅の下限も銘柄のボラティリティに合わせる(固定%だと指数では成立しない)
+        const move=Math.abs(c/a.o-1)*100>=this._volTh(C,3,1.2,2.0);
+        if(big&&move&&a.c>a.o&&b.c>b.o&&up&&a.c<b.c&&b.c<c) out.push('three_white_soldiers');
+        if(big&&move&&a.c<a.o&&b.c<b.o&&dn&&a.c>b.c&&b.c>c) out.push('three_black_crows');
+      }
+    }
+    return out;
+  },
+
+  /* ── チャートパターン ──────────────────────────
+     「直近 recentBars 本以内に成立したもの」だけを有効として返す。 */
+  charts(O,H,L,C){
+    const n=C.length;
+    if(n<40) return [];
+    const out=[];
+    const recent=(CONFIG.patterns&&CONFIG.patterns.recentBars)||5;
+
+    // ① フラッグ／ペナント: 大きなインパルスの後の小さな調整
+    for(const consol of [6,8,10,12]){
+      const impEnd=n-consol, impStart=impEnd-14;
+      if(impStart<1) continue;
+      const imp=(C[impEnd-1]/C[impStart]-1)*100;
+      if(Math.abs(imp)<8) continue;                       // インパルスは8%以上
+      const segH=Math.max(...H.slice(impEnd-1)), segL=Math.min(...L.slice(impEnd-1));
+      if((segH-segL)/segL*100 > Math.abs(imp)*0.5) continue;  // 調整幅はインパルスの5割未満
+      const drift=(C[n-1]/C[impEnd-1]-1)*100;
+      // 調整局面が収束していればペナント、平行なチャネルならフラッグ
+      const half=Math.floor(consol/2);
+      const r1=Math.max(...H.slice(impEnd-1,impEnd-1+half))-Math.min(...L.slice(impEnd-1,impEnd-1+half));
+      const r2=Math.max(...H.slice(impEnd-1+half))-Math.min(...L.slice(impEnd-1+half));
+      const conv=r2<r1*0.70;
+      if(imp<=-8&&drift>=-2){ out.push(conv?'bear_pennant':'bear_flag'); break; }
+      if(imp>= 8&&drift<= 2){ out.push(conv?'bull_pennant':'bull_flag'); break; }
+    }
+
+    // ② 三角持ち合い: 直近2組のピボットの傾きで分類
+    const pv=this._pivots(H,L,3,60);
+    if(pv.hi.length>=2&&pv.lo.length>=2){
+      const h1=pv.hi[pv.hi.length-2], h2=pv.hi[pv.hi.length-1];
+      const l1=pv.lo[pv.lo.length-2], l2=pv.lo[pv.lo.length-1];
+      const span=Math.max(h2.i-h1.i, l2.i-l1.i);
+      if(Math.max(n-1-h2.i, n-1-l2.i)<=8 && span>=10){
+        const hS=(h2.v-h1.v)/h1.v*100, lS=(l2.v-l1.v)/l1.v*100;
+        const flat=1.5;    // これ以下なら「水平」とみなす
+        const move=2.0;    // 明確に動いたとみなす傾き
+        const sym=0.5;     // 対称三角形の判定はやや緩め
+        if(Math.abs(hS)<=flat&&lS>move)       out.push('ascending_triangle');
+        else if(Math.abs(lS)<=flat&&hS<-move) out.push('descending_triangle');
+        else if(hS<-sym&&lS>sym)              out.push('symmetrical_triangle');
+      }
+    }
+
+    // ③ ダブルトップ／ダブルボトム: 同水準の2つのピボットと、その間の谷/山
+    const pv2=this._pivots(H,L,3,90);
+    const hi60=Math.max(...H.slice(-60)), lo60=Math.min(...L.slice(-60));
+    if(pv2.hi.length>=2){
+      const a=pv2.hi[pv2.hi.length-2], b=pv2.hi[pv2.hi.length-1];
+      const gap=Math.abs(b.v-a.v)/a.v, span=b.i-a.i;
+      // 2つの山がほぼ同値(2%以内)・十分離れている・間に5%以上の谷・
+      // かつ直近60本の高値圏で起きていること
+      if(gap<=0.020&&span>=8&&span<=50&&(n-1-b.i)<=recent&&b.v>=hi60*0.97){
+        const trough=Math.min(...L.slice(a.i,b.i+1));
+        if((a.v-trough)/a.v>=0.035) out.push('double_top');
+      }
+    }
+    if(pv2.lo.length>=2){
+      const a=pv2.lo[pv2.lo.length-2], b=pv2.lo[pv2.lo.length-1];
+      const gap=Math.abs(b.v-a.v)/a.v, span=b.i-a.i;
+      if(gap<=0.025&&span>=8&&span<=50&&(n-1-b.i)<=recent&&b.v<=lo60*1.07){
+        const peak=Math.max(...H.slice(a.i,b.i+1));
+        if((peak-a.v)/a.v>=0.035) out.push('double_bottom');
+      }
+    }
+
+    // ④ V字トップ／V字ボトム: 直近12本での急騰→急落 / 急落→急騰
+    //    閾値を固定%にすると、値動きの小さい指数ETFではまず成立せず、
+    //    値動きの大きい個別株では出っぱなしになる。そこで銘柄自身の
+    //    ボラティリティ(直近60本の日次変化率の標準偏差)を基準にする。
+    if(n>=70){
+      const w=12, seg=C.slice(-w);
+      const th=this._volTh(C,6,0.9,1.0);   // 6本ぶんの標準的な変動幅(MAD基準)
+      let pi=0, ti=0;
+      seg.forEach((v,k)=>{ if(v>seg[pi]) pi=k; if(v<seg[ti]) ti=k; });
+      const rise=(seg[pi]/seg[0]-1)*100, fall=(seg[w-1]/seg[pi]-1)*100;
+      if(pi>=2&&pi<=w-3&&rise>=th&&fall<=-th) out.push('v_top');
+      const drop=(seg[ti]/seg[0]-1)*100, reb=(seg[w-1]/seg[ti]-1)*100;
+      if(ti>=2&&ti<=w-3&&drop<=-th&&reb>=th) out.push('v_bottom');
+    }
+    return out;
+  },
+
+  /* ── 検出結果を Layer3 プラグインの戻り値へ変換 ──
+     検出した各パターンの実測超過リターンを合算し、符号で方向を決める。
+     kind: 'cdl'（ローソク足） or 'cp'（チャートパターン） */
+  toSignal(kind, ids, market){
+    const cfg=CONFIG.patterns;
+    if(!cfg||!cfg.enabled||!ids.length) return{type:'none',note:'該当なし',applicable:false};
+    const tbl=cfg[kind]||{}, mk=(market==='JP')?'JP':'US';
+    const hits=[];
+    let net=0;
+    ids.forEach(id=>{
+      const e=tbl[id];
+      if(!e) return;
+      const v=e[mk];
+      if(!v) return;               // そのマーケットでは方向性なしと判定されたもの
+      net+=v;
+      hits.push({id, jp:e.jp, book:e.book, v});
+    });
+    if(!hits.length) return{type:'none',note:'該当なし',applicable:false};
+    const names=hits.map(x=>{
+      const dir=x.v>0?'買い':'売り';
+      const rev=((x.book==='弱気'&&x.v>0)||(x.book==='強気'&&x.v<0))?'／逆神':'';
+      return `${x.jp}(教科書${x.book}→実測${dir}${rev} ${x.v>0?'+':''}${x.v}pt)`;
+    });
+    if(Math.abs(net)<cfg.deadband){
+      return{type:'none', note:'方向なし ｜ '+names.join('、'), hits, net};
+    }
+    const strength=Math.min(1, Math.abs(net)/cfg.cap);
+    return{
+      // 超過リターンが正=その後上がった=買い=底寄り。この実装では 'bullish' が底寄り。
+      type: net>0?'bullish':'bearish',
+      strength,
+      note: (net>0?'買い寄り':'売り寄り')+` 合計${net>0?'+':''}${Math.round(net*100)/100}pt ｜ `+names.join('、'),
+      label: net>0?'パターン(買い寄り)':'パターン(売り寄り)',
+      hits, net,
+    };
+  },
+};
+
 // ─── 確認プラグイン定義 ──────────────────────────────────────────────
 // enabled:true のプラグインのみスコア計算に参加する。
 // 将来的なプライスアクション追加手順:
@@ -2253,6 +2562,13 @@ const CONFIRMATION_PLUGINS=[
   {id:'obvDiv', name:'OBVダイバージェンス', enabled:true,
    compute:(C,H,L,V)=>calcOBVDiv(C,V,25),
    weight:()=>CONFIG.layer3Weights.obvDiv},
+  // ── パターン系 (2026-07-25 追加 / 作業2)。外部APIは不要 ──────────
+  {id:'candlePat',name:'ローソク足パターン',enabled:true,
+   compute:(C,H,L,V,O,market)=>PAT.toSignal('cdl',PAT.candles(O,H,L,C),market),
+   weight:()=>CONFIG.layer3Weights.candlePat||0},
+  {id:'chartPat', name:'チャートパターン',  enabled:true,
+   compute:(C,H,L,V,O,market)=>PAT.toSignal('cp', PAT.charts(O,H,L,C), market),
+   weight:()=>CONFIG.layer3Weights.chartPat||0},
   // ── プライスアクション（将来追加用・現在は無効）──────────────────
   // {id:'pinbar',     name:'ピンバー',          enabled:false,
   //  compute:(C,H,L,V)=>null, weight:()=>CONFIG.layer3Weights.pinbar||0},
@@ -2264,18 +2580,26 @@ const CONFIRMATION_PLUGINS=[
   //  compute:(C,H,L,V)=>null, weight:()=>CONFIG.layer3Weights.failedBreak||0},
 ];
 
-function computeLayer3(C,H,L,V){
-  const active=CONFIRMATION_PLUGINS.filter(p=>p.enabled);
+function computeLayer3(C,H,L,V,O=null,market='US'){
+  const active=CONFIRMATION_PLUGINS.filter(p=>p.enabled&&p.weight()>0);
   const items=active.map(p=>{
     let d=null;
-    try{ d=p.compute(C,H,L,V); }catch(e){}
+    try{ d=p.compute(C,H,L,V,O,market); }catch(e){}
     return{name:p.name,id:p.id,d,w:p.weight()};
   });
-  const wSum=items.reduce((a,b)=>a+b.w,0)||1;
+  /* パターン系は「毎日値が出る指標」ではなく「イベント検出器」なので、
+     何も検出されなかった日は分母から外す。こうしないと、パターンが無い日にも
+     ダイバージェンス系のシグナルが2割薄まってしまう。
+     ダイバージェンス系は applicable を返さないため常に分母に入り、挙動は従来どおり。 */
+  const wSum=items.filter(it=>!(it.d&&it.d.applicable===false))
+                  .reduce((a,b)=>a+b.w,0)||1;
   let raw=0;
   items.forEach(it=>{
-    if(it.d?.type==='bearish') raw+=it.w;
-    else if(it.d?.type==='bullish') raw-=it.w;
+    // strength(0〜1)を持つプラグインは、その強さに応じて按分して加点する。
+    // 既存のダイバージェンス系はstrengthを返さないため 1 とみなされ、挙動は変わらない。
+    const st=(it.d&&typeof it.d.strength==='number')?Math.max(0,Math.min(1,it.d.strength)):1;
+    if(it.d?.type==='bearish') raw+=it.w*st;
+    else if(it.d?.type==='bullish') raw-=it.w*st;
   });
   const score=Math.round(Math.max(0,Math.min(100, 50+raw/wSum*50))*10)/10;
   return{score,items};
@@ -2688,7 +3012,7 @@ function analyse({opens:O=[],closes:C,highs:H,lows:L,volumes:V,dates:D=[],meta},
   const layer2=computeLayer2(C,H,L,V,regime);
 
   // ── Layer 3: 反転確認 ──
-  const layer3=computeLayer3(C,H,L,V);
+  const layer3=computeLayer3(C,H,L,V,O,mk);
 
   // ── Layer 4: 市場心理 ──
   const hiloProxy=calcHILOProxy(C);
@@ -2714,7 +3038,7 @@ function analyse({opens:O=[],closes:C,highs:H,lows:L,volumes:V,dates:D=[],meta},
    Layer2(市場行動)+Layer3(反転確認)のみで
    各日時点のLayer5相当スコアを遡及計算する。
 ═══════════════════════════════════════════════ */
-function computeHistoricalScores(C,H,L,V,D=[],vixHistory=[],maxDays=132){
+function computeHistoricalScores(C,H,L,V,D=[],vixHistory=[],maxDays=132,O=null,market='US'){
   const n=C.length, minWindow=80; // ADX/KER等を考慮しやや多めに確保
   const days=Math.min(maxDays, n-minWindow);
   if(days<=0) return[];
@@ -2728,6 +3052,7 @@ function computeHistoricalScores(C,H,L,V,D=[],vixHistory=[],maxDays=132){
      「描画後にrequestIdleCallbackで計算する」(scheduleHistory)側で解決している。 */
   for(let i=n-days;i<n;i++){
     const c=C.slice(0,i+1), h=H.slice(0,i+1), l=L.slice(0,i+1), v=V.slice(0,i+1);
+    const op=O?O.slice(0,i+1):null;
     if(c.length<minWindow) continue;
     let regime=null;
     try{
@@ -2739,7 +3064,7 @@ function computeHistoricalScores(C,H,L,V,D=[],vixHistory=[],maxDays=132){
       regime=classifyRegime(slope,adx,ker,cloud,maStruct,atrV);
     }catch(e){ regime=null; }
     const l2=computeLayer2(c,h,l,v,regime);
-    const l3=computeLayer3(c,h,l,v);
+    const l3=computeLayer3(c,h,l,v,op,market);
     const layer2Net=50+(l2.topScore-l2.bottomScore)/2;
     const w2=0.69,w3=0.31; // w4除外分を w2:w3 = 0.55:0.25 の比で再配分
     const total=Math.round(Math.max(0,Math.min(100,w2*layer2Net+w3*l3.score))*10)/10;
@@ -3192,13 +3517,17 @@ function renderResult(result){
   document.getElementById('gaugeConfirm').innerHTML=renderSmallGauge(layer3.score,scoreColor(layer3.score),'反転確認');
   document.getElementById('confirmList').innerHTML=layer3.items.map(it=>{
     const type=it.d?.type||'none';
-    const tag=type==='bearish'?{t:'弱気Div(天井)',c:'#D85A30',bg:'rgba(216,90,48,.15)'}
-              :type==='bullish'?{t:'強気Div(大底)',c:'#1D9E75',bg:'rgba(29,158,117,.15)'}
+    const tag=type==='bearish'?{t:it.d?.label||'弱気Div(天井)',c:'#D85A30',bg:'rgba(216,90,48,.15)'}
+              :type==='bullish'?{t:it.d?.label||'強気Div(大底)',c:'#1D9E75',bg:'rgba(29,158,117,.15)'}
               :{t:'なし',c:'#7878a0',bg:'rgba(120,120,160,.12)'};
+    // パターン系は検出内容が長いので、行の下に小さく内訳を出す
+    const detail=(it.d&&it.d.hits&&it.d.hits.length)
+      ? `<div style="font-size:10.5px;color:var(--t3);line-height:1.5;margin:-2px 0 6px;padding-left:2px">${it.d.note}</div>`
+      : '';
     return`<div class="div-row">
       <span style="color:var(--t1)">${it.name}</span>
       <span class="div-tag" style="color:${tag.c};background:${tag.bg}">${tag.t}</span>
-    </div>`;
+    </div>${detail}`;
   }).join('');
 
   /* ═══ LAYER 4 ═══ */
@@ -3458,8 +3787,9 @@ function generateReport(result){
   t+='  スコア: '+layer3.score.toFixed(1)+'/100（50=なし,高い=弱気Div,低い=強気Div）\n';
   layer3.items.forEach(it=>{
     const type=it.d?.type||'none';
-    const lab=type==='bearish'?'弱気ダイバージェンス(天井確認)':type==='bullish'?'強気ダイバージェンス(大底確認)':'なし';
+    const lab=it.d?.label||(type==='bearish'?'弱気ダイバージェンス(天井確認)':type==='bullish'?'強気ダイバージェンス(大底確認)':'なし');
     t+='  '+pad(it.name,22)+lab+'\n';
+    if(it.d&&it.d.hits&&it.d.hits.length) t+='  '+pad('',22)+it.d.note+'\n';
   });
 
   t+='\n'+line+'\n【Layer4】市場心理（Market Psychology）\n'+line+'\n';
@@ -3545,7 +3875,8 @@ function scheduleHistory(key,data,sentiment,days){
   const run2=()=>{
     try{
       const h=computeHistoricalScores(data.closes,data.highs,data.lows,data.volumes,
-                                      data.dates,sentiment?.vix?.history,132);
+                                      data.dates,sentiment?.vix?.history,132,
+                                      data.opens,sentiment?.market||'US');
       _histMemo.set(memoKey,h);
       if(_histMemo.size>40) _histMemo.delete(_histMemo.keys().next().value);
       const c=dataCache.get(key); if(c) c.historical=h;
