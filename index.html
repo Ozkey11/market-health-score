@@ -148,6 +148,11 @@ button:disabled{opacity:.4;cursor:default}
 .chart-toolbar{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
 @media(max-width:560px){.entry-grid{grid-template-columns:1fr}.entry-score{text-align:left}.entry-bar-row{grid-template-columns:82px 1fr 32px}}
 
+/* ── お気に入り一覧の指標帯 (2026-07-25) ── */
+.fav-metrics{display:flex;flex-wrap:wrap;gap:4px 12px;padding:3px 4px 8px 4px;font-size:10.5px;color:var(--t2);
+  border-bottom:.5px solid var(--bd);margin-bottom:2px}
+.fav-metrics b{font-family:var(--mono);color:var(--t1);font-weight:600}
+
 /* ── EDGE パネル (2026-07-24) ── */
 .edge-card{border:.5px solid var(--bd);border-radius:var(--r);padding:11px 12px;background:var(--bg);text-align:left}
 .edge-prob{font-size:30px;font-weight:700;line-height:1.1;font-family:var(--mono)}
@@ -408,9 +413,11 @@ button:disabled{opacity:.4;cursor:default}
       <button class="chip" id="hist1m" style="padding:3px 12px;font-size:11px">1ヶ月</button>
       <button class="chip" id="hist3m" style="padding:3px 12px;font-size:11px">3ヶ月</button>
       <button class="chip" id="hist6m" style="padding:3px 12px;font-size:11px">6ヶ月</button>
+      <button class="chip" id="hist1y" style="padding:3px 12px;font-size:11px">1年</button>
     </span>
   </p>
   <div class="panel" id="histPanel" style="padding:14px">
+    <div id="histSeriesToggle" style="display:flex;flex-wrap:wrap;gap:5px;margin:6px 0 4px"></div>
     <div id="histChart"></div>
   </div>
 
@@ -613,6 +620,13 @@ var Favorites={
       f.topScore=p.topScore??f.topScore;
       f.price=p.price??f.price;
       f.change=p.change??f.change;
+      // 2026-07-25 追加: 一覧に出す指標
+      f.er=p.er??f.er;                 // エントリー準備度
+      f.erLabel=p.erLabel??f.erLabel;  // 「待機」「監視」などの状態
+      f.prob=p.prob??f.prob;           // 20日先の上昇確率
+      f.probBase=p.probBase??f.probBase;
+      f.depth=p.depth??f.depth;        // 深度D
+      f.conf=p.conf??f.conf;           // コンフィデンス
       f.n=p.name||f.n||c;
       f.market=p.market||f.market||detectMarket(c);
       f.scoredAt=Date.now();
@@ -620,6 +634,33 @@ var Favorites={
     }
   },
 };
+
+/* 解析結果から、お気に入り一覧に保存する項目を作る (2026-07-25 追加)。
+   スコア分析ページとお気に入りページの双方から同じ関数を使うことで、
+   「片方で更新したのに、もう片方に反映されない」状態を防ぐ。 */
+function favPayloadFromResult(result){
+  if(!result) return null;
+  let er=null, prob=null, probBase=null;
+  try{ er=computeEntryReadiness(result); }catch(e){}
+  try{
+    const p=EDGE.probability(result, result.info?.market||'US', result.__sentiment);
+    if(p&&p.show){ prob=p.prob; probBase=p.base; }
+  }catch(e){}
+  return{
+    score:result.integration?.allOverall,
+    bottomScore:result.integration?.allBottom,
+    topScore:result.integration?.allTop,
+    price:result.info?.cur,
+    change:result.info?.pch,
+    name:result.info?.name,
+    market:result.info?.market,
+    er:er?er.score:null,
+    erLabel:er?er.label:null,
+    prob, probBase,
+    depth:result.depth?.d??null,
+    conf:result.layer5?.confidence??null,
+  };
+}
 async function renderFavorites(){
   const arr=await Favorites.list(), box=document.getElementById('favChips'),
         bar=document.getElementById('favBar');
@@ -866,6 +907,45 @@ const CONFIG={
     },
   },
 
+  /* ══════════════════════════════════════════════════════════
+     SUPPLY: 需給データの取り扱い (2026-07-25 追加)
+     バッチが集めた data/supply.json を読み、EDGE層の補正として使う。
+     Layer1〜5 のスコア本体には手を入れない。
+
+     【重く配分してはいけない理由】
+     需給バックテスト v2.1 で、日本株は「スコアが低いほど信用買残Zが高い」
+     (total≦20 で +1.42σ、total 40-60 で +0.23σ) ことが分かっている。
+     つまり需給情報はすでにテクニカルスコアへ相当程度織り込まれており、
+     独立レイヤーとして大きく配分すると同じ情報を二重に数えることになる。
+     一方、米国の空売り出来高Zはどのスコア帯でもほぼ無変化(-0.18〜+0.10)で、
+     完全に独立した情報だった。したがって配分は米国を厚く・日本を薄くする。
+
+     【実測値の出典】
+       米 空売り出来高Z ≧2   : 20日超過 +0.56 / 勝率62.5% (v6.0 §1)
+          レジーム別でも上昇+0.39 / レンジ+0.33 / 下落+0.44 と安定 (v2.1)
+       米 空売り出来高Z ≦-2  : 5日 -0.44 (ショートカバー完了=燃料切れ)
+       日 信用買残Z ≧2       : 20日超過 +1.36 / 陽性率79% (v7.0 §8-1)
+          ただし 200日線-10%以下の押し目局面に限れば +1.46
+       日 空売り比率 ≧45%    : +0.73 / 陽性率83% (v7.0 §8-1)
+       日 買残混雑 ≧80       : -0.05 / 陽性率48% = 無情報。ゲートに使わない
+       米 AAII spread ≦-30   : +1.25 (v7.0 §6-1)
+     ══════════════════════════════════════════════════════════ */
+  supply:{
+    enabled:true,
+    url:'./data/supply.json',
+    maxAgeDays:{US:5, JP:12},   // これより古い需給データは「参考」に落とす
+    zWindow:60,                 // Zスコアの計算窓(営業日)
+    // 準備度への寄与の上限。米国を厚く、日本を薄くする(上記の理由)
+    maxAdjust:{US:6, JP:3},
+    factors:{
+      svrZHigh:  {th: 2.0, US:+0.56, JP:null, label:'空売り出来高の急増', ref:'v6.0 §1'},
+      svrZLow:   {th:-2.0, US:-0.44, JP:null, label:'空売り出来高の急減', ref:'v6.0 §1'},
+      marginLongZ:{th:2.0, US:null,  JP:+1.36, label:'信用買残の急増',   ref:'v7.0 §8-1'},
+      shortRatioHigh:{th:45, US:null, JP:+0.73, label:'空売り比率が高い', ref:'v7.0 §8-1'},
+      aaiiBearish:{th:-30, US:+1.25, JP:+1.25, label:'AAII 個人が総悲観', ref:'v7.0 §6-1'},
+    },
+  },
+
   // Layer5: Confidence計算パラメータ
   confidence:{
     agreementWeight:   0.45,  // レイヤー間一致度の寄与率
@@ -951,6 +1031,14 @@ async function renderFavList(){
     const sc=f.score!=null?f.score.toFixed(1):'—';
     const bs=f.bottomScore!=null?f.bottomScore.toFixed(1):'—';
     const ts=f.topScore!=null?f.topScore.toFixed(1):'—';
+    // 2026-07-25 追加の指標
+    const erV=f.er!=null?Math.round(f.er):null;
+    const erCol=erV==null?'var(--t3)':erV>=60?'#0F7A52':erV>=50?'#1D9E75':erV>=35?'#6FBF9B':'var(--t2)';
+    const probTxt=f.prob!=null
+      ? `${f.prob.toFixed(0)}%`+(f.probBase!=null?`<span style="color:var(--t3)"> /平常${f.probBase}</span>`:'')
+      : '<span style="color:var(--t3)">方向感なし</span>';
+    const dpV=f.depth!=null&&f.depth>0?f.depth.toFixed(1):null;
+    const cfV=f.conf!=null?Math.round(f.conf):null;
     const pr=f.price!=null?f.price.toLocaleString(undefined,{maximumFractionDigits:2}):'—';
     const ch=f.change!=null?(f.change>=0?'+':'')+f.change.toFixed(2)+'%':'—';
     const chColor=f.change>0?'#1D9E75':f.change<0?'#D85A30':'var(--t2)';
@@ -971,6 +1059,13 @@ async function renderFavList(){
       </div>
       <button class="fav-chart-btn" data-fc="${f.c}" data-fs="${f.s}" style="padding:4px 8px;font-size:11px;background:var(--bg3);color:var(--t2);border:.5px solid var(--bd2);border-radius:5px;cursor:pointer" title="チャートを表示">📈</button>
       <button class="fav-scan-btn" data-fc="${f.c}" data-fs="${f.s}" style="padding:4px 8px;font-size:11px;background:var(--bg3);color:var(--t2);border:.5px solid var(--bd2);border-radius:5px;cursor:pointer" title="この銘柄のスコアを更新">↻</button>
+    </div>
+    <div class="fav-metrics">
+      <span title="総合判定スコア">総合 <b>${sc}</b></span>
+      <span title="エントリー準備度" style="color:${erCol}">準備度 <b>${erV??'—'}</b>${f.erLabel?`<span style="color:var(--t3)"> ${f.erLabel}</span>`:''}</span>
+      <span title="20日先の上昇確率（平常時との比較）">20日上昇 <b>${probTxt}</b></span>
+      ${dpV?`<span title="深度D（青天井の超過分）" style="color:#D85A30">深度D <b>${dpV}</b></span>`:''}
+      <span title="コンフィデンス（指標の一致度）">確度 <b>${cfV??'—'}</b></span>
     </div>`;
   }).join('');
   // ページャー
@@ -1047,16 +1142,17 @@ async function scanOneFav(code,srcVal){
     saveFundManual();
     const data=clean(raw);
     const result=analyse(data,sentiment,market,fa);
-    const price=result.info?.cur;
-    const change=result.info?.pch;
-    const score=result.integration?.allOverall;
-    await Favorites.updateScore(code,srcVal||'yahoo',{
-      score:score!=null?Math.round(score*10)/10:null,
-      bottomScore:result.integration?.allBottom,
-      topScore:result.integration?.allTop,
-      price,change,name:result.info?.name,market
-    });
+    const p=favPayloadFromResult(result);
+    if(p&&p.score!=null) p.score=Math.round(p.score*10)/10;
+    await Favorites.updateScore(code,srcVal||'yahoo',p);
     await PriceCache.save(srcVal,sym,raw);
+    /* 2026-07-25 修正:
+       従来はお気に入り側でスキャンしても dataCache に入れていなかったため、
+       スコア分析ページへ移動すると同じ銘柄を取り直していた。
+       双方向で結果を共有するため、ここでもメモリキャッシュへ格納する。 */
+    // キーの作り方は run() と必ず揃える。ズレると双方でキャッシュが共有されない
+    const key=cacheKeyFor(srcVal||'yahoo',sym);
+    dataCache.set(key,{raw,sentiment,market,fundAuto:fa,result,historical:[],fetchedAt:Date.now()});
     renderFavList();
     return result;
   }catch(e){console.warn('scan failed:',code,e.message);throw e;}
@@ -1228,7 +1324,19 @@ document.getElementById('btnFundReload').addEventListener('click',()=>runFundOnl
 document.getElementById('btnFav').addEventListener('click',()=>{
   const sym=getCurSym(),c=src==='yahoo'?sym.y:(sym.a||sym.y);
   const bestName=_lastResult?.info?.name||sym.name||c;
-  Favorites.toggle(c,src,bestName).then(()=>{updateFavBtn();renderFavorites();renderFavList();});
+  /* 2026-07-25 修正:
+     従来は toggle() が {コード,名前,追加日時} だけを保存していたため、
+     「スコア分析でスキャン → ☆で登録 → お気に入りページへ移動」の順に操作すると
+     スコアが空のままだった。syncFavorite() は登録済みの銘柄しか更新しないので、
+     登録前にスキャンした結果が取り込まれなかったことが原因。
+     登録した瞬間に、直前の解析結果を書き込むようにする。 */
+  Favorites.toggle(c,src,bestName).then(async(added)=>{
+    if(added&&_lastResult){
+      const p=favPayloadFromResult(_lastResult);
+      if(p) await Favorites.updateScore(c,src,p);
+    }
+    updateFavBtn();renderFavorites();renderFavList();
+  });
 });
 if(avKey) document.getElementById('iKeyAV').value=avKey;
 document.getElementById('btnClearHist').addEventListener('click',()=>{
@@ -3028,7 +3136,9 @@ function analyse({opens:O=[],closes:C,highs:H,lows:L,volumes:V,dates:D=[],meta},
     layer1:regime, layer2, layer3, layer4, layer5, fund, integration, depth,
     info:{cur,prev:meta.prev,pch,n,symbol:meta.symbol,name:meta.name,ma50,ma200,market:mk},
     series:{opens:O,closes:C,highs:H,lows:L,volumes:V,dates:D},
-    __sentiment:sentiment
+    __sentiment:sentiment,
+    // 需給データ(supply.json)を引くためのキー。Yahoo形式のコード。
+    __supplySymbol:meta.symbol||null
   };
 }
 
@@ -3038,7 +3148,7 @@ function analyse({opens:O=[],closes:C,highs:H,lows:L,volumes:V,dates:D=[],meta},
    Layer2(市場行動)+Layer3(反転確認)のみで
    各日時点のLayer5相当スコアを遡及計算する。
 ═══════════════════════════════════════════════ */
-function computeHistoricalScores(C,H,L,V,D=[],vixHistory=[],maxDays=132,O=null,market='US'){
+function computeHistoricalScores(C,H,L,V,D=[],vixHistory=[],maxDays=250,O=null,market='US'){
   const n=C.length, minWindow=80; // ADX/KER等を考慮しやや多めに確保
   const days=Math.min(maxDays, n-minWindow);
   if(days<=0) return[];
@@ -3050,10 +3160,22 @@ function computeHistoricalScores(C,H,L,V,D=[],vixHistory=[],maxDays=132,O=null,m
      切り詰めるとスコアが最大3.7pt変わることを実測で確認した。
      スコアの厳密性を優先し全期間prefixのまま残す。体感速度は
      「描画後にrequestIdleCallbackで計算する」(scheduleHistory)側で解決している。 */
+  /* 2026-07-25 拡張:
+     従来は Layer2/3 だけの「テクニカル合成スコア(total)」1本だけを返していた。
+     チャートに総合判定・エントリー準備度・コンフィデンス・深度D・上昇確率を
+     重ねるため、各日について analyse() を通して同じ計算経路で値を揃える。
+
+     注意: ファンダメンタルは過去分を持っていないため、全期間で現在値を使う。
+     したがって overall(総合判定) のファンダ寄与は日ごとに変化しない。
+     total(テクニカル合成) は従来と完全に同じ計算のまま残してある。 */
+  const fundAuto=(typeof _fundAuto!=='undefined'&&_fundAuto)?_fundAuto:null;
   for(let i=n-days;i<n;i++){
     const c=C.slice(0,i+1), h=H.slice(0,i+1), l=L.slice(0,i+1), v=V.slice(0,i+1);
     const op=O?O.slice(0,i+1):null;
     if(c.length<minWindow) continue;
+    const date=D[i]||'';
+    const vix=date?vixByDate.get(date)??null:null;
+
     let regime=null;
     try{
       const slope=calcMA200Slope(c,20), adx=calcADX(h,l,c,14), ker=calcKER(c,10);
@@ -3068,8 +3190,33 @@ function computeHistoricalScores(C,H,L,V,D=[],vixHistory=[],maxDays=132,O=null,m
     const layer2Net=50+(l2.topScore-l2.bottomScore)/2;
     const w2=0.69,w3=0.31; // w4除外分を w2:w3 = 0.55:0.25 の比で再配分
     const total=Math.round(Math.max(0,Math.min(100,w2*layer2Net+w3*l3.score))*10)/10;
-    const date=D[i]||'';
-    out.push({offset:n-1-i,date,total,price:c[c.length-1],vix:date?vixByDate.get(date)??null:null});
+
+    // ── 追加の系列 ──────────────────────────────
+    let overall=null, er=null, erLabel=null, conf=null, depthD=null, prob=null, probBase=null;
+    try{
+      const sent=vix!=null?{vix:{price:vix},market}:{market};
+      const l4=computeLayer4(sent,calcHILOProxy(c),market);
+      const fund=computeFundamental(fundAuto,getFundManual());
+      const integ=computeIntegration(l2,l3,l4,fund);
+      const dep=computeDepth(l2,sent,fundAuto);
+      const l5=computeLayer5(l2,l3,l4,regime,fund);
+      const rlike={
+        layer1:regime,layer2:l2,layer3:l3,layer4:l4,layer5:l5,fund,integration:integ,depth:dep,
+        info:{cur:c[c.length-1],n:c.length,market},
+        series:{opens:op||[],closes:c,highs:h,lows:l,volumes:v,dates:D.slice(0,i+1)},
+        __sentiment:sent,
+      };
+      overall=Math.round(clamp100(integ.allOverall)*10)/10;
+      conf=Math.round(clamp100(l5.confidence)*10)/10;
+      depthD=dep&&Number.isFinite(dep.d)?Math.round(dep.d*10)/10:0;
+      const e=computeEntryReadiness(rlike);
+      er=e.score; erLabel=e.label;
+      const p=EDGE.probability(rlike,market,sent);
+      if(p){ prob=p.show?p.prob:null; probBase=p.base; }
+    }catch(e){ /* 一部が計算できなくても total は返す */ }
+
+    out.push({offset:n-1-i,date,total,overall,er,erLabel,conf,depth:depthD,prob,probBase,
+              price:c[c.length-1],vix});
   }
   return out;
 }
@@ -3134,21 +3281,89 @@ function renderGauge(score){
 }
 
 /* ── スコア推移ラインチャート (0-100スケール) ── */
+/* ═══════════════════════════════════════════════
+   スコア推移チャート (2026-07-25 全面改修)
+   従来はテクニカル合成スコアとVIXの2本だけだった。
+   総合判定・エントリー準備度・コンフィデンス・深度D・20日上昇確率を追加し、
+   買いサイン/天井サインをアイコンで示す。
+   系列が多いと読みづらいため、凡例をタップして表示/非表示を切り替えられる。
+═══════════════════════════════════════════════ */
+const HIST_SERIES=[
+  {key:'total',   label:'テクニカル合成', color:'#7B74E0', on:true},
+  {key:'overall', label:'総合判定',       color:'#2b6cb0', on:true},
+  {key:'er',      label:'エントリー準備度',color:'#1D9E75', on:true},
+  {key:'conf',    label:'コンフィデンス',  color:'#8a6d00', on:false},
+  {key:'prob',    label:'20日上昇確率',    color:'#c2557a', on:false},
+];
+let histVisible=null;      // 表示中の系列 (null=既定)
+let histShowDepth=true;    // 深度Dの棒グラフ
+let histShowVix=true;
+let histShowIcons=true;
+
+function _histVisibleSet(){
+  if(!histVisible){
+    histVisible=new Set(HIST_SERIES.filter(x=>x.on).map(x=>x.key));
+  }
+  return histVisible;
+}
+
+function renderHistoryToggle(){
+  const box=document.getElementById('histSeriesToggle');
+  if(!box) return;
+  const vis=_histVisibleSet();
+  const mk=(key,label,color,active)=>
+    `<button class="hist-tg" data-k="${key}" style="padding:3px 9px;font-size:10.5px;border-radius:11px;cursor:pointer;
+      border:.5px solid ${active?color:'var(--bd2)'};background:${active?color+'22':'transparent'};
+      color:${active?color:'var(--t3)'}">${active?'●':'○'} ${label}</button>`;
+  box.innerHTML=
+    HIST_SERIES.map(x=>mk(x.key,x.label,x.color,vis.has(x.key))).join('')
+    +mk('__depth','深度D(棒)','#D85A30',histShowDepth)
+    +mk('__vix','VIX/日経VI','#D89030',histShowVix)
+    +mk('__icons','サイン','#1D9E75',histShowIcons);
+  box.querySelectorAll('.hist-tg').forEach(b=>b.addEventListener('click',()=>{
+    const k=b.dataset.k;
+    if(k==='__depth') histShowDepth=!histShowDepth;
+    else if(k==='__vix') histShowVix=!histShowVix;
+    else if(k==='__icons') histShowIcons=!histShowIcons;
+    else { const v=_histVisibleSet(); v.has(k)?v.delete(k):v.add(k); }
+    const sym=getCurSym(),key=cacheKeyFor(src,sym);
+    if(dataCache.has(key)) renderHistoryChart(dataCache.get(key).historical,histRangeDays);
+  }));
+}
+
+/* 買いサイン/天井サインの判定。
+   エントリー準備度は較正済みの閾値(v4.0)に合わせて3段階に分ける。
+     ER≧60 … 強い準備   ER≧50 … 準備あり   ER≧35 … 兆候
+   天井側は総合判定80以上を警戒とする。 */
+function histSignal(d){
+  if(d.er!=null){
+    if(d.er>=60) return{tier:3,color:'#0F7A52',mark:'▲',title:'エントリー準備度 '+d.er+'（強い準備）'};
+    if(d.er>=50) return{tier:2,color:'#1D9E75',mark:'▲',title:'エントリー準備度 '+d.er+'（準備あり）'};
+    if(d.er>=35) return{tier:1,color:'#6FBF9B',mark:'△',title:'エントリー準備度 '+d.er+'（兆候）'};
+  }
+  if(d.overall!=null&&d.overall>=80) return{tier:-1,color:'#D85A30',mark:'▼',title:'総合判定 '+d.overall+'（天井警戒）'};
+  return null;
+}
+
 function renderHistoryChart(hist,days){
   const box=document.getElementById('histChart');
+  renderHistoryToggle();
   if(!hist||hist.length===0){
     box.innerHTML='<p style="font-size:12px;color:var(--t2);text-align:center;padding:16px 0">データ不足のため推移を表示できません</p>';
     return;
   }
+  const vis=_histVisibleSet();
   const slice=hist.slice(-days);
-  const W=720,H=230,padL=38,padR=44,padT=30,padB=34;
-  const innerW=W-padL-padR, innerH=H-padT-padB;
   const n=slice.length;
+  const hasDepth=histShowDepth&&slice.some(d=>(d.depth||0)>0);
+  const depthH=hasDepth?34:0;          // 深度Dの棒に使う下部の帯
+  const W=720,H=270+depthH,padL=38,padR=44,padT=30,padB=34+depthH;
+  const innerW=W-padL-padR, innerH=H-padT-padB;
   const xAt=i=>padL+(n===1?innerW/2:innerW*i/(n-1));
   const yScore=v=>padT+innerH*(1-Math.max(0,Math.min(100,v))/100);
 
   const vixVals=slice.map(d=>d.vix).filter(v=>v!=null&&!isNaN(v));
-  const hasVix=vixVals.length>=2;
+  const hasVix=histShowVix&&vixVals.length>=2;
   let vMin=0,vMax=1;
   if(hasVix){
     const lo=Math.min(...vixVals), hi=Math.max(...vixVals), span=Math.max(4,hi-lo);
@@ -3161,12 +3376,52 @@ function renderHistoryChart(hist,days){
     `<line x1="${padL}" y1="${yScore(v)}" x2="${W-padR}" y2="${yScore(v)}" stroke="#404060" stroke-width="${v===50?1:.6}" opacity="${v===50?.7:.35}" ${v===50?'stroke-dasharray="3,3"':''}/>
      <text x="${padL-6}" y="${yScore(v)+4}" text-anchor="end" fill="#8888a8" font-size="10" font-family="'Courier New',monospace">${v}</text>`
   ).join('');
-  const scorePts=slice.map((d,i)=>`${xAt(i)},${yScore(d.total)}`).join(' ');
-  const scoreLineColor='#7B74E0', vixColor='#D89030';
-  const scoreDots=slice.map((d,i)=>{
-    const isLast=i===n-1,c=scoreColor(d.total),date=d.date||`${d.offset}営業日前`;
-    return `<circle cx="${xAt(i)}" cy="${yScore(d.total)}" r="${isLast?4.5:2.3}" fill="${isLast?c:scoreLineColor}"><title>${date} スコア ${d.total}${d.vix!=null?' / VIX '+d.vix.toFixed(1):''}</title></circle>`;
-  }).join('');
+
+  // ── 折れ線(欠損は線を切る) ──
+  const lineSvg=[];
+  HIST_SERIES.forEach(sd=>{
+    if(!vis.has(sd.key)) return;
+    const segs=[]; let cur=[];
+    slice.forEach((d,i)=>{
+      const v=d[sd.key];
+      if(v==null||isNaN(v)){ if(cur.length>1)segs.push(cur); cur=[]; return; }
+      cur.push(`${xAt(i)},${yScore(v)}`);
+    });
+    if(cur.length>1)segs.push(cur);
+    const dash=sd.key==='prob'?' stroke-dasharray="4,3"':'';
+    lineSvg.push(segs.map(g=>`<polyline points="${g.join(' ')}" fill="none" stroke="${sd.color}" stroke-width="${sd.key==='total'?2.2:1.8}" stroke-linejoin="round" stroke-linecap="round"${dash}/>`).join(''));
+    // 単独の点(前後が欠損)も見えるように打つ
+    slice.forEach((d,i)=>{
+      const v=d[sd.key];
+      if(v==null||isNaN(v)) return;
+      const prev=i>0?slice[i-1][sd.key]:null, next=i<n-1?slice[i+1][sd.key]:null;
+      if((prev==null||isNaN(prev))&&(next==null||isNaN(next)))
+        lineSvg.push(`<circle cx="${xAt(i)}" cy="${yScore(v)}" r="2.2" fill="${sd.color}"/>`);
+    });
+    const last=[...slice].reverse().find(d=>d[sd.key]!=null&&!isNaN(d[sd.key]));
+    if(last){
+      const li=slice.lastIndexOf(last);
+      lineSvg.push(`<circle cx="${xAt(li)}" cy="${yScore(last[sd.key])}" r="4" fill="${sd.color}"><title>${last.date||''} ${sd.label} ${last[sd.key]}</title></circle>`);
+    }
+  });
+
+  // ── 深度D(棒グラフ) ──
+  let depthSvg='';
+  if(hasDepth){
+    const maxD=Math.max(...slice.map(d=>d.depth||0),1);
+    const base=H-padB+depthH-4;
+    const bw=Math.max(1.5,Math.min(9,innerW/n*0.6));
+    depthSvg=`<line x1="${padL}" y1="${base}" x2="${W-padR}" y2="${base}" stroke="#404060" stroke-width=".6" opacity=".5"/>`
+      +`<text x="${padL-6}" y="${base+4}" text-anchor="end" fill="#D85A30" font-size="9">D</text>`
+      +slice.map((d,i)=>{
+        const v=d.depth||0;
+        if(v<=0) return '';
+        const hgt=Math.max(2,(depthH-8)*v/maxD);
+        return `<rect x="${xAt(i)-bw/2}" y="${base-hgt}" width="${bw}" height="${hgt}" fill="#D85A30" opacity=".75" rx="1"><title>${d.date||''} 深度D ${v}</title></rect>`;
+      }).join('');
+  }
+
+  // ── VIX(右軸) ──
   let vixSvg='';
   if(hasVix){
     const segments=[];let cur=[];
@@ -3175,11 +3430,27 @@ function renderHistoryChart(hist,days){
       cur.push(`${xAt(i)},${yVix(d.vix)}`);
     });
     if(cur.length>1)segments.push(cur);
-    const lines=segments.map(seg=>`<polyline points="${seg.join(' ')}" fill="none" stroke="${vixColor}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`).join('');
-    const dots=slice.map((d,i)=>d.vix==null?'':`<circle cx="${xAt(i)}" cy="${yVix(d.vix)}" r="2" fill="${vixColor}"><title>${d.date||''} VIX/日経VI ${d.vix.toFixed(1)}</title></circle>`).join('');
-    const rt=[vMax,(vMin+vMax)/2,vMin].map(v=>`<text x="${W-padR+6}" y="${yVix(v)+4}" text-anchor="start" fill="${vixColor}" font-size="10" font-family="'Courier New',monospace">${v.toFixed(1)}</text>`).join('');
-    vixSvg=lines+dots+rt;
+    const lines=segments.map(seg=>`<polyline points="${seg.join(' ')}" fill="none" stroke="#D89030" stroke-width="1.5" opacity=".85" stroke-linejoin="round" stroke-linecap="round"/>`).join('');
+    const rt=[vMax,(vMin+vMax)/2,vMin].map(v=>`<text x="${W-padR+6}" y="${yVix(v)+4}" text-anchor="start" fill="#D89030" font-size="10" font-family="'Courier New',monospace">${v.toFixed(1)}</text>`).join('');
+    vixSvg=lines+rt;
   }
+
+  // ── サインアイコン ──
+  let iconSvg='';
+  if(histShowIcons){
+    const step=n>120?2:1;   // 密になりすぎないよう間引く
+    iconSvg=slice.map((d,i)=>{
+      if(i%step!==0&&i!==n-1) return '';
+      const sig=histSignal(d);
+      if(!sig) return '';
+      const anchor=sig.tier>0
+        ? (d.er!=null?yScore(d.er):yScore(d.total))
+        : (d.overall!=null?yScore(d.overall):yScore(d.total));
+      const y=sig.tier>0?anchor+13:anchor-8;
+      return `<text x="${xAt(i)}" y="${y}" text-anchor="middle" fill="${sig.color}" font-size="${sig.tier===3||sig.tier===-1?11:9}">${sig.mark}<title>${d.date||''} ${sig.title}</title></text>`;
+    }).join('');
+  }
+
   const labelStep=n<=8?1:Math.ceil(n/6);
   const fmtDate=(d)=>{
     if(!d) return '';
@@ -3190,16 +3461,16 @@ function renderHistoryChart(hist,days){
     if(i%labelStep!==0&&i!==n-1)return'';
     return `<text x="${xAt(i)}" y="${H-9}" text-anchor="middle" fill="#8888a8" font-size="10">${fmtDate(d.date)}</text>`;
   }).join('');
-  const last=slice[n-1];
-  const lastLabel=`<text x="${xAt(n-1)-4}" y="${yScore(last.total)-9}" text-anchor="end" fill="${scoreColor(last.total)}" font-size="12" font-weight="700">${last.total}</text>`;
-  const legend=`<g transform="translate(${padL},9)"><circle cx="4" cy="5" r="4" fill="${scoreLineColor}"/><text x="13" y="9" fill="#9090b0" font-size="11">スコア（左軸）</text>${hasVix?`<circle cx="122" cy="5" r="4" fill="${vixColor}"/><text x="131" y="9" fill="#9090b0" font-size="11">VIX/日経VI（右軸）</text>`:''}</g>`;
-  box.innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;max-width:100%" role="img" aria-label="スコアとVIXの推移">
-    ${legend}${grid}
+
+  box.innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;max-width:100%" role="img" aria-label="スコア推移">
+    ${grid}
     <rect x="${padL}" y="${yScore(100)}" width="${innerW}" height="${yScore(80)-yScore(100)}" fill="#D85A30" opacity="0.06"/>
     <rect x="${padL}" y="${yScore(20)}" width="${innerW}" height="${yScore(0)-yScore(20)}" fill="#1D9E75" opacity="0.06"/>
-    <polyline points="${scorePts}" fill="none" stroke="${scoreLineColor}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
-    ${scoreDots}${vixSvg}${lastLabel}${xlabels}
-  </svg>`;
+    ${vixSvg}${lineSvg.join('')}${depthSvg}${iconSvg}${xlabels}
+  </svg>
+  <p style="font-size:10px;color:var(--t3);line-height:1.5;margin-top:4px">
+    凡例をタップすると表示/非表示を切り替えられます。▲は買いサイン(濃いほど強い)、▼は天井警戒。
+    20日上昇確率は方向感のある日だけ点灯します。深度Dは0を超えた日のみ棒で表示します。</p>`;
 }
 
 
@@ -3210,11 +3481,15 @@ function renderCandlestickChart(seriesData,days=66){
   if(candleChartInstance){try{candleChartInstance.remove();}catch(e){} candleChartInstance=null;}
   cc.innerHTML='';
   const d=seriesData||{};
-  const C=d.closes||[],H=d.highs||[],L=d.lows||[],O=d.opens||[],D=d.dates||[];
-  const end=C.length,start=Math.max(0,end-days),candles=[];
+  const C=d.closes||[],H=d.highs||[],L=d.lows||[],O=d.opens||[],D=d.dates||[],V=d.volumes||[];
+  const end=C.length,start=Math.max(0,end-days),candles=[],volumes=[];
   for(let i=start;i<end;i++){
     if(!D[i]||C[i]==null||H[i]==null||L[i]==null)continue;
-    candles.push({time:D[i],open:O[i]!=null?O[i]:(i?C[i-1]:C[i]),high:H[i],low:L[i],close:C[i]});
+    const op=O[i]!=null?O[i]:(i?C[i-1]:C[i]);
+    candles.push({time:D[i],open:op,high:H[i],low:L[i],close:C[i]});
+    // 出来高は陽線/陰線で色を変える (2026-07-25 追加)
+    if(V[i]!=null&&!isNaN(V[i]))
+      volumes.push({time:D[i],value:V[i],color:C[i]>=op?'rgba(29,158,117,.45)':'rgba(216,90,48,.45)'});
   }
   if(candles.length<2){
     cc.innerHTML='<p style="font-size:12px;color:var(--t2);text-align:center;padding:40px 0">日付付きOHLCデータが不足しているためチャートを表示できません。</p>';
@@ -3239,6 +3514,19 @@ function renderCandlestickChart(seriesData,days=66){
       wickUpColor:'#1D9E75',wickDownColor:'#D85A30',
     });
     cs.setData(candles);
+    /* 出来高 (2026-07-25 追加)
+       別スケール('vol')の下部30%に重ねる。価格の目盛りとは独立させることで
+       ローソク足の縦幅を潰さずに済む。 */
+    if(volumes.length>=2){
+      try{
+        const vs=candleChartInstance.addHistogramSeries({
+          priceFormat:{type:'volume'}, priceScaleId:'vol',
+          lastValueVisible:false, priceLineVisible:false,
+        });
+        vs.priceScale().applyOptions({scaleMargins:{top:0.72,bottom:0}});
+        vs.setData(volumes);
+      }catch(e){ console.warn('出来高の描画に失敗:',e); }
+    }
     candleChartInstance.timeScale().fitContent();
     candleResizeObserver=new ResizeObserver(()=>{
       if(candleChartInstance&&cc.clientWidth>0)candleChartInstance.applyOptions({width:cc.clientWidth});
@@ -3253,6 +3541,100 @@ function renderCandlestickChart(seriesData,days=66){
 
 function clamp100(v){return Math.max(0,Math.min(100,Number.isFinite(v)?v:0));}
 
+
+/* ═══════════════════════════════════════════════
+   SUPPLY — 需給データの読み込みと評価 (2026-07-25 追加)
+   バッチ(batch/fetch_supply_*.py)が作る data/supply.json を読む。
+   ファイルが無い/古い場合でも、他の機能に影響しないよう静かに無効化する。
+═══════════════════════════════════════════════ */
+const SUPPLY={
+  data:null, loaded:false, error:null,
+  async load(){
+    if(this.loaded) return this.data;
+    this.loaded=true;
+    if(!CONFIG.supply?.enabled) return null;
+    try{
+      const r=await fetch(CONFIG.supply.url,{cache:'no-store'});
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      this.data=await r.json();
+      console.log('需給データ読込:',this.data.symbol_count+'銘柄 /',
+                  Object.keys(this.data.market||{}).join(','));
+    }catch(e){
+      this.error=e.message;
+      console.log('需給データは未取得です（バッチ未実行の可能性）:',e.message);
+    }
+    return this.data;
+  },
+  // 直近の値と、その系列でのZスコアを返す
+  _zOf(series){
+    if(!series||series.length<10) return null;
+    const win=CONFIG.supply.zWindow;
+    const vals=series.slice(-win).map(x=>x.value).filter(v=>Number.isFinite(v));
+    if(vals.length<10) return null;
+    const mu=vals.reduce((a,b)=>a+b,0)/vals.length;
+    const sd=Math.sqrt(vals.reduce((a,b)=>a+(b-mu)*(b-mu),0)/vals.length);
+    const last=series[series.length-1];
+    return{value:last.value, date:last.date, release:last.release,
+           z: sd>0?(last.value-mu)/sd:0};
+  },
+  _ageDays(d){
+    if(!d) return 9999;
+    const t=Date.parse(d+'T00:00:00Z');
+    return isNaN(t)?9999:Math.floor((Date.now()-t)/86400000);
+  },
+  /* 銘柄の需給を評価する。戻り値は準備度への加点(pt)と内訳。 */
+  evaluate(symbol,market){
+    const cfg=CONFIG.supply;
+    if(!cfg?.enabled||!this.data) return null;
+    const mk=market==='JP'?'JP':'US';
+    const sym=this.data.symbols?.[symbol]||{};
+    const mkt=this.data.market?.[mk]||{};
+    const hits=[];
+    const add=(key,z,detail,stale)=>{
+      const f=cfg.factors[key]; if(!f) return;
+      const v=f[mk]; if(v==null) return;
+      hits.push({key,label:f.label,delta:v,ref:f.ref,z,detail,stale});
+    };
+    const maxAge=cfg.maxAgeDays[mk];
+
+    // 米国: 空売り出来高比率のZスコア
+    const svr=this._zOf(sym.short_volume_ratio);
+    if(svr){
+      const stale=this._ageDays(svr.date)>maxAge;
+      if(svr.z>=cfg.factors.svrZHigh.th)
+        add('svrZHigh',svr.z,`比率 ${(svr.value*100).toFixed(1)}% / Z ${svr.z.toFixed(1)}`,stale);
+      else if(svr.z<=cfg.factors.svrZLow.th)
+        add('svrZLow',svr.z,`比率 ${(svr.value*100).toFixed(1)}% / Z ${svr.z.toFixed(1)}`,stale);
+    }
+    // 日本: 信用買残のZスコア
+    const ml=this._zOf(sym.margin_long);
+    if(ml&&ml.z>=cfg.factors.marginLongZ.th){
+      add('marginLongZ',ml.z,`買残 ${Math.round(ml.value).toLocaleString()}株 / Z ${ml.z.toFixed(1)}`,
+          this._ageDays(ml.date)>maxAge);
+    }
+    // 日本: 空売り比率(市場全体)
+    const sr=mkt.short_sale_ratio;
+    if(sr&&sr.length){
+      const last=sr[sr.length-1];
+      if(last.value>=cfg.factors.shortRatioHigh.th)
+        add('shortRatioHigh',null,`${last.value}%`,this._ageDays(last.date)>maxAge);
+    }
+    // AAII(市場全体・米国側に格納)
+    const aa=this.data.market?.US?.aaii_spread;
+    if(aa&&aa.length){
+      const last=aa[aa.length-1];
+      if(last.value<=cfg.factors.aaiiBearish.th)
+        add('aaiiBearish',null,`spread ${last.value}`,this._ageDays(last.date)>14);
+    }
+    if(!hits.length) return null;
+    // 古いデータは寄与を半分にする(PIT整合性の観点で、鮮度が落ちた情報は割り引く)
+    let net=0;
+    hits.forEach(h=>{ net += h.stale?h.delta*0.5:h.delta; });
+    const cap=cfg.maxAdjust[mk];
+    const adj=Math.max(-cap,Math.min(cap,net));
+    return{hits,net:Math.round(net*100)/100,adjust:Math.round(adj*10)/10,market:mk};
+  },
+};
 
 /* ═══════════════════════════════════════════════
    EDGE — バックテスト実測に基づく補正・確率提示 (2026-07-24)
@@ -3422,8 +3804,22 @@ function computeEntryReadiness(result){
      米国=静かな押し目が効く / 日本=投げを伴う底が効く。 */
   const vadj=EDGE.volumeAdjust(result.series?.volumes,result.info?.market);
   const beforeVol=score;
-  score=Math.round(clamp100(score*vadj.mult));
+  score=clamp100(score*vadj.mult);
   const volDelta=Math.round((score-beforeVol)*10)/10;
+  /* 需給補正 (2026-07-25 追加)
+     data/supply.json が読めているときだけ効く。読めていなければ何もしない。
+     配分は米国±6pt・日本±3ptを上限にしている。日本を薄くしているのは、
+     スコアが低いほど信用買残Zが高い(=すでにスコアへ織り込み済み)ためで、
+     厚く配分すると同じ情報の二重計上になる。 */
+  let supAdj=null;
+  try{
+    if(result.__supplySymbol!==undefined)
+      supAdj=SUPPLY.evaluate(result.__supplySymbol,result.info?.market);
+  }catch(e){}
+  const beforeSup=score;
+  if(supAdj&&supAdj.adjust) score=clamp100(score+supAdj.adjust);
+  const supDelta=Math.round((score-beforeSup)*10)/10;
+  score=Math.round(score);
   // しきい値はバックテスト校正済み(6銘柄×32年: ≧60は平均+7.7〜8.0%/勝率88〜93%、50-59は+5.2〜6.9%/76%)
   let label='待機',color='#7878a0',action='条件不足。極端値または反転確認を待つ';
   if(score>=60){label='反転確認済み';color='#1D9E75';action='分割エントリーの最終確認段階（損切り条件を先に設定）';}
@@ -3439,8 +3835,9 @@ function computeEntryReadiness(result){
   ];
   if(depthBonus>=0.5) parts.push({name:'深度ボーナス',value:Math.round(depthBonus),weight:'+'});
   if(Math.abs(volDelta)>=0.5) parts.push({name:(vadj.label||'出来高補正'),value:volDelta,weight:'×'});
+  if(Math.abs(supDelta)>=0.5) parts.push({name:'需給補正',value:supDelta,weight:'+'});
   return{score,label,color,action,parts,depthBonus:Math.round(depthBonus*10)/10,
-         volAdjust:{...vadj,delta:volDelta}};
+         volAdjust:{...vadj,delta:volDelta}, supply:supAdj?{...supAdj,delta:supDelta}:null};
 }
 
 function renderResult(result){
@@ -3646,6 +4043,18 @@ function renderResult(result){
         要因どうしは相関するため、合算時は寄与の大きい順に0.6倍ずつ減衰させています(単純加算はしません)。
         これは統計的な傾向であり、個別の予測ではありません。</p>
       </details>` : '';
+    const sup=er.supply;
+    const supHtml = (sup&&sup.hits&&sup.hits.length) ? `
+      <div style="margin-top:6px;padding-top:6px;border-top:.5px dotted var(--bd)">
+        <div style="font-size:11px;color:var(--t2)">需給（バッチ取得データ）</div>
+        ${sup.hits.map(h=>`<div class="edge-row"><span>${h.label}${h.detail?` <span style="color:var(--t3)">${h.detail}</span>`:''}${h.stale?'<span class="edge-tag" style="color:#BA7517;background:rgba(186,117,23,.15)">鮮度低</span>':''}</span>
+          <span style="color:${h.delta>0?'#1D9E75':'#D85A30'};font-family:var(--mono)">${h.delta>0?'+':''}${h.delta}pt</span></div>`).join('')}
+        <div class="edge-row"><span style="color:var(--t2)">準備度への反映（上限 ±${CONFIG.supply.maxAdjust[sup.market]}pt）</span>
+          <span style="font-family:var(--mono);color:${(sup.delta||0)>0?'#1D9E75':'#D85A30'}">${(sup.delta||0)>0?'+':''}${sup.delta||0}</span></div>
+        <p style="font-size:10px;color:var(--t3);margin-top:3px;line-height:1.5">
+          日本株は配分を薄くしています。スコアが低いほど信用買残Zが高い（total≦20で+1.42σ）ため、
+          厚く配分すると同じ情報を二重に数えることになるためです。</p>
+      </div>` : '';
     const volHtml = va.label ? `
       <div class="edge-row"><span>${va.label}${va.rvol?` <span style="color:var(--t3)">${va.rvol.toFixed(2)}倍</span>`:''}</span>
       <span style="font-family:var(--mono);color:${(va.delta||0)>0?'#1D9E75':(va.delta||0)<0?'#D85A30':'var(--t2)'}">
@@ -3665,6 +4074,7 @@ function renderResult(result){
         </div>
         <div style="flex:1;min-width:190px">${rows}${volHtml}</div>
       </div>
+      ${supHtml}
       ${qtHtml}
       <div style="margin-top:9px;padding-top:8px;border-top:.5px solid var(--bd)">
         <div style="font-size:11px;color:var(--t2)">想定保有期間（${mkt==='JP'?'日本株':'米国株'}の実測に基づく）</div>
@@ -3875,7 +4285,7 @@ function scheduleHistory(key,data,sentiment,days){
   const run2=()=>{
     try{
       const h=computeHistoricalScores(data.closes,data.highs,data.lows,data.volumes,
-                                      data.dates,sentiment?.vix?.history,132,
+                                      data.dates,sentiment?.vix?.history,250,
                                       data.opens,sentiment?.market||'US');
       _histMemo.set(memoKey,h);
       if(_histMemo.size>40) _histMemo.delete(_histMemo.keys().next().value);
@@ -3888,6 +4298,8 @@ function scheduleHistory(key,data,sentiment,days){
 }
 
 async function run(force){
+  // 需給データは初回のみ読み込む(失敗しても他の処理は続行する)
+  if(!SUPPLY.loaded) await SUPPLY.load();
   ['dResult','dErr'].forEach(id=>document.getElementById(id).style.display='none');
   const sym=getCurSym(), key=cacheKeyFor(src,sym);
   const manualCode=document.getElementById('iSym').value.trim().toUpperCase();
@@ -3896,16 +4308,11 @@ async function run(force){
 
   async function syncFavorite(result){
     if(!result||!(await Favorites.has(favoriteCode,src))) return;
-    await Favorites.updateScore(favoriteCode,src,{
-      score:result.integration?.allOverall,
-      bottomScore:result.integration?.allBottom,
-      topScore:result.integration?.allTop,
-      price:result.info?.cur,
-      change:result.info?.pch,
-      name:result.info?.name,
-      market:result.info?.market,
-    });
+    const p=favPayloadFromResult(result);
+    if(p) await Favorites.updateScore(favoriteCode,src,p);
     renderFavorites();
+    // お気に入りページを開いたままでも即座に反映されるようにする
+    if(document.getElementById('page-fav')?.classList.contains('active')) renderFavList();
   }
 
   // ─ Step 1: メモリキャッシュ (同一セッション内) ─
@@ -4059,11 +4466,11 @@ async function run(force){
 // スコア推移レンジ切替
 function setHistoryRange(days,activeId){
   histRangeDays=days;
-  ['hist1w','hist1m','hist3m','hist6m'].forEach(id=>document.getElementById(id)?.classList.toggle('on',id===activeId));
+  ['hist1w','hist1m','hist3m','hist6m','hist1y'].forEach(id=>document.getElementById(id)?.classList.toggle('on',id===activeId));
   const sym=getCurSym(),key=cacheKeyFor(src,sym);
   if(dataCache.has(key))renderHistoryChart(dataCache.get(key).historical,histRangeDays);
 }
-[['hist1w',5],['hist1m',22],['hist3m',66],['hist6m',132]].forEach(([id,days])=>{
+[['hist1w',5],['hist1m',22],['hist3m',66],['hist6m',132],['hist1y',250]].forEach(([id,days])=>{
   document.getElementById(id)?.addEventListener('click',()=>setHistoryRange(days,id));
 });
 
