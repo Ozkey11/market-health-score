@@ -14,6 +14,9 @@ Zスコアやパーセンタイルを計算するには過去の履歴が必要�
   # JPXの信用残PDFが入ったフォルダを取り込む
   py batch\import_supply_history.py --jpx path\to\jpx_pdf
 
+  # AAIIセンチメントの全期間スプレッドシートを取り込む
+  py batch\import_supply_history.py --aaii path\to\aaii_sentiment.xls
+
   # 銘柄を絞る（既定は data/watchlist.json。--all で全銘柄）
   py batch\import_supply_history.py --finra data\finra --all
 
@@ -32,7 +35,80 @@ from datetime import date, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from db import connect, init_db, upsert_supply_symbol   # noqa: E402
+from db import connect, init_db, upsert_supply_symbol, upsert_supply   # noqa: E402
+
+
+def import_aaii(conn, path, verbose=True):
+    """AAIIの全期間スプレッドシートを取り込む。戻り値 (取込週数, 失敗数)。
+
+    AAIIの配布ファイルは以下の形:
+      4行目がヘッダ (Date / Bullish / Neutral / Bearish / Total)
+      6行目以降がデータ。値は小数 (0.36 = 36%)
+    全期間データはAAII会員限定のため、手元のファイルを取り込む方式にしている。
+    """
+    try:
+        import pandas as pd
+    except ImportError:
+        print("  pandas が必要です: py -m pip install pandas xlrd openpyxl")
+        return 0, 1
+    try:
+        df = pd.read_excel(path, header=None)
+    except Exception as e:
+        print(f"  読み込みに失敗しました: {type(e).__name__}: {e}")
+        print("  .xls なら xlrd、.xlsx なら openpyxl が必要です")
+        return 0, 1
+
+    # ヘッダ行(Date/Bullish/Bearish が並ぶ行)を探す
+    hdr = None
+    for i in range(min(20, len(df))):
+        row = [str(x).strip().lower() for x in df.iloc[i].tolist()]
+        if "date" in row and "bullish" in row and "bearish" in row:
+            hdr = i
+            cols = {name: row.index(name) for name in ("date", "bullish", "neutral", "bearish")
+                    if name in row}
+            break
+    if hdr is None:
+        print("  ヘッダ行(Date/Bullish/Bearish)が見つかりません")
+        return 0, 1
+
+    ok = ng = 0
+    for i in range(hdr + 1, len(df)):
+        r = df.iloc[i]
+        try:
+            d = pd.to_datetime(r[cols["date"]], errors="coerce")
+            if pd.isna(d):
+                continue
+            bull = r[cols["bullish"]]
+            bear = r[cols["bearish"]]
+            if pd.isna(bull) or pd.isna(bear):
+                continue
+            bull, bear = float(bull), float(bear)
+            # 小数(0.36)でも百分率(36.0)でも受け付ける
+            if bull <= 1.5 and bear <= 1.5:
+                bull, bear = bull * 100, bear * 100
+            neut = r[cols["neutral"]] if "neutral" in cols else None
+            if neut is not None and not pd.isna(neut):
+                neut = float(neut)
+                if neut <= 1.5:
+                    neut *= 100
+            else:
+                neut = None
+            ds = d.date().isoformat()
+            upsert_supply(conn, "US", ds, "aaii_bull", round(bull, 2), "AAII Sentiment Survey")
+            upsert_supply(conn, "US", ds, "aaii_bear", round(bear, 2), "AAII Sentiment Survey")
+            upsert_supply(conn, "US", ds, "aaii_spread", round(bull - bear, 2), "AAII Sentiment Survey")
+            if neut is not None:
+                upsert_supply(conn, "US", ds, "aaii_neutral", round(neut, 2), "AAII Sentiment Survey")
+            ok += 1
+        except Exception:
+            ng += 1
+    conn.commit()
+    if verbose and ok:
+        rng = conn.execute(
+            "SELECT MIN(date), MAX(date) FROM supply_demand_daily WHERE metric_name='aaii_bull'"
+        ).fetchone()
+        print(f"    {ok}週分を取り込みました (期間 {rng[0]} 〜 {rng[1]})")
+    return ok, ng
 
 
 def import_finra(conn, folder, want, verbose=True):
@@ -122,11 +198,12 @@ def main():
     ap = argparse.ArgumentParser(description="需給データの過去分をSQLiteへ取り込みます。")
     ap.add_argument("--finra", metavar="DIR", help="FINRA日次ファイル(CNMSshvol*.txt)のフォルダ")
     ap.add_argument("--jpx", metavar="DIR", help="JPX信用残PDFのフォルダ")
+    ap.add_argument("--aaii", metavar="FILE", help="AAIIセンチメントのスプレッドシート(.xls/.xlsx)")
     ap.add_argument("--all", action="store_true",
                     help="ウォッチリストで絞らず全銘柄を取り込む（FINRAは容量が大きくなります）")
     args = ap.parse_args()
 
-    if not args.finra and not args.jpx:
+    if not args.finra and not args.jpx and not args.aaii:
         ap.print_help()
         return 1
 
@@ -148,6 +225,11 @@ def main():
         print("[JPX] PDFを取り込みます")
         ok, ng = import_jpx(conn, args.jpx)
         print(f"[JPX] 完了: 成功 {ok}件 / 失敗 {ng}件")
+
+    if args.aaii:
+        print("[AAII] スプレッドシートを取り込みます")
+        ok, ng = import_aaii(conn, args.aaii)
+        print(f"[AAII] 完了: 成功 {ok}週 / 失敗 {ng}週")
 
     n = conn.execute("SELECT COUNT(*) FROM supply_symbol_daily").fetchone()[0]
     syms = conn.execute("SELECT COUNT(DISTINCT symbol) FROM supply_symbol_daily").fetchone()[0]

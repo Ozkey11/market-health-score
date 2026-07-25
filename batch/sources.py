@@ -93,6 +93,17 @@ SOURCES = {
             {"name": "FINRA 短期売買データ 説明", "url": "https://www.finra.org/finra-data/browse-catalog/short-sale-volume-data"},
         ],
     },
+    "supply:jp_short_ratio": {
+        "label": "日本 空売り比率 (JPX 空売り集計・日次)",
+        "links": [{"name": "空売り集計(日次)", "url": "https://www.jpx.co.jp/markets/statistics-equities/short-selling/index.html"}],
+    },
+    "sentiment:aaii_survey": {
+        "label": "AAII センチメント (週次)",
+        "links": [
+            {"name": "AAII Sentiment Survey", "url": "https://www.aaii.com/sentimentsurvey"},
+            {"name": "過去データ(会員限定)", "url": "https://www.aaii.com/sentimentsurvey/sent_results"},
+        ],
+    },
     "supply:jp_margin": {
         "label": "日本 信用取引残高 (JPX)",
         "links": [

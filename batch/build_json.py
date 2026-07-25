@@ -182,6 +182,16 @@ def build_supply(conn, days=400):
     for sym, d, metric, val, rel, src in rows:
         s = obj["symbols"].setdefault(sym, {})
         s.setdefault(metric, []).append({"date": d, "value": val, "release": rel})
+    # 市場全体の需給(空売り比率・AAII等)も同じJSONに載せる
+    obj["market"] = {}
+    mrows = conn.execute(
+        """SELECT market, date, metric_name, value FROM supply_demand_daily
+           WHERE date >= date('now', ?) ORDER BY date""",
+        (f"-{days} days",),
+    ).fetchall()
+    for mk, d, metric, val in mrows:
+        obj["market"].setdefault(mk, {}).setdefault(metric, []).append({"date": d, "value": val})
+    obj["market_row_count"] = len(mrows)
     obj["symbol_count"] = len(obj["symbols"])
     obj["row_count"] = len(rows)
     _write("supply.json", obj)

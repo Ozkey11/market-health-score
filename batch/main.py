@@ -9,6 +9,7 @@ batch/main.py — GitHub Actions から呼ばれる統合バッチ
   Step 3  センチメント fetch_sentiment.fetch_all_sentiment -> SQLite sentiment_daily
   Step 4  ファンダ     fetch_fundamentals.run_fetch        -> data/fundamentals.json
   Step 5  需給         fetch_supply_us / fetch_supply_jp   -> SQLite supply_symbol_daily
+                       fetch_supply_extra                  -> SQLite supply_demand_daily
   Step 6  配信JSON生成 build_json.*                        -> data/*.json
 
 --------------------------------------------------------------------
@@ -176,8 +177,17 @@ def main():
                 print("  [日本] 失敗: {}: {}".format(type(e).__name__, e))
                 traceback.print_exc()
                 ng += 1
+            # 空売り比率(JPX日次)とAAIIセンチメント (2026-07-25 追加 / 作業4)
+            try:
+                from fetch_supply_extra import fetch_all_extra
+                a, b = fetch_all_extra(conn, run_id)
+                ok += a; ng += b
+            except Exception as e:
+                print("  [補助指標] 失敗: {}: {}".format(type(e).__name__, e))
+                traceback.print_exc()
+                ng += 1
             return ok, ng
-        run_step(5, "supply", "需給データの取得（FINRA空売り出来高・JPX信用残）",
+        run_step(5, "supply", "需給データの取得（FINRA空売り出来高・JPX信用残・空売り比率・AAII）",
                  _supply, counters, errors)
     else:
         skipped.append("supply")

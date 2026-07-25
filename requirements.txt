@@ -4,3 +4,6 @@ pypdf>=5.0.0
 # 任意: あればPDF解析が10倍以上速くなる (85ページ実測 pypdf 3.3秒 -> pymupdf 0.23秒)
 # 無くても pypdf にフォールバックするため必須ではない
 pymupdf>=1.24.0
+# AAIIの過去データ(.xls)を取り込む場合のみ必要 (import_supply_history.py --aaii)
+# 日々のバッチには不要
+# xlrd>=2.0.1
