@@ -1,13 +1,21 @@
 name: Update Market Data
+
+# UTC 22:30（= 翌日 JST 07:30）月〜金。
+# この時刻は「米国のその日の引け(20:00-21:00 UTC)」と
+# 「日本のその日の引け(06:00 UTC)」の両方より後になるため、
+# 1回の実行で日米そろった当日終値を取得できる。
 on:
   schedule:
-    - cron: "30 22 * * 1-5"   # 平日 JST 07:30
+    - cron: "30 22 * * 1-5"
   workflow_dispatch:            # 手動実行
+
 concurrency:
   group: update-market-data
   cancel-in-progress: false
+
 permissions:
   contents: write
+
 jobs:
   update:
     runs-on: ubuntu-latest
@@ -23,23 +31,55 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      # 全ステップ（価格・マクロ・センチメント・ファンダ・配信JSON生成）を実行する。
+      # 一部が失敗しても main.py は続行し、失敗内容を data/data_quality.json に残す。
+      # 全滅した場合のみ非ゼロで終了する。
       - name: Run batch
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         run: python batch/main.py
 
-      - name: Commit updated data
+      # 取得できなかった項目をログに出す。バッチが赤くなっても中身が分かるよう always。
+      - name: Show data quality summary
+        if: always()
         run: |
+          if [ -f data/data_quality.json ]; then
+            python - <<'PY'
+          import json
+          d = json.load(open("data/data_quality.json", encoding="utf-8"))
+          items = d.get("items", [])
+          ng = [i for i in items if i.get("status") == "failed"]
+          print(f"取得項目 {len(items)}件 / 失敗 {len(ng)}件")
+          for i in ng:
+              print(f"  [NG] {i['item']}: {i['message']}")
+              if i.get("source_link"):
+                  print(f"        取得先: {i['source_link']}")
+          PY
+          else
+            echo "data/data_quality.json が生成されていません"
+          fi
+
+      # 部分的な失敗でもコミットする。
+      # ここを if: always() にしないと、取得に失敗したという記録そのものが
+      # 配信されず、アプリ側で原因が分からなくなる。
+      #
+      # コミット対象は data/ 配下のみ。database/market_data.sqlite は
+      # 1.2MBのバイナリで毎営業日コミットするとリポジトリが肥大化するため除外する。
+      # （SQLiteは毎回3年分を取り直すので、コミットしなくても配信JSONは正しく作られる）
+      # DBも履歴として残したい場合は下の git add に database/ を追加する。
+      - name: Commit updated data
+        if: always()
+        run: |
+          if [ ! -d data ]; then
+            echo "data/ が無いためスキップ"; exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/fundamentals.json || true
-          git stash
-          git pull --rebase origin main
-          git stash pop || true
-          git add data/fundamentals.json || true
+          git add -A data/
           if git diff --cached --quiet; then
-            echo "No changes"
-          else
-            git commit -m "Update market data [skip ci]"
-            git push origin main
+            echo "変更なし"
+            exit 0
           fi
+          git commit -m "Update market data [skip ci]"
+          git pull --rebase origin main
+          git push origin main

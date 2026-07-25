@@ -179,3 +179,8 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+# Market Health Score — SQLite の一時ファイル
+# （WALモードで動かすため、実行中に -wal / -shm が生成される。これらはコミットしない）
+database/*.sqlite-wal
+database/*.sqlite-shm
+database/*.sqlite-journal

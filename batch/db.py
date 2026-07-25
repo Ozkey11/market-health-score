@@ -199,11 +199,24 @@ def upsert_fundamental_latest(conn, symbol, metric, value, as_of_date, source, i
 
 
 def log_quality(conn, run_id, item, status, message="", source_link=""):
+    """取得可否のログを記録する。
+
+    2026-07-25 修正:
+      各fetcherは失敗時に `conn.rollback()` → `log_quality()` の順で呼ぶため、
+      ここでコミットしないと「次の銘柄が失敗したときのrollback」で
+      直前のログ挿入ごと巻き戻されてしまっていた。
+      実測では価格8件・センチメント4件・マクロ1件の計13件の失敗のうち
+      4件しか残らず、data_quality.json が実態を反映していなかった。
+      ログは追記専用なので、ここで即コミットして確実に残す。
+      （呼び出し側はいずれも commit/rollback 直後に呼んでおり、
+        未コミットのデータ書き込みを巻き込む心配はない）
+    """
     conn.execute(
         """INSERT INTO data_quality_log(run_id,item,status,message,source_link,occurred_at)
            VALUES(?,?,?,?,?,?)""",
         (run_id, item, status, message, source_link, now_iso()),
     )
+    conn.commit()
 
 
 def log_run(conn, run_id, started_at, finished_at, status, detail=""):
