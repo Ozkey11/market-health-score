@@ -2756,24 +2756,32 @@ let _fundAuto=null,_fundAutoAt=0,_fundJson=null,_fundJsonAt=0;
 
 /* GitHub上のfundamentals.jsonを取得 → 手入力欄を自動入力 + Yahoo系データを返す */
 async function fetchFundJsonFromGitHub(){
-  // URL: 入力欄 → localStorage の順で取得
-  let url='';
+  /* 2026-07-26 修正:
+     従来はURLを手で設定しないと何も読まなかった（「URL未設定」で終了）。
+     そのため、バッチが正しく fundamentals.json を作っていても
+     Put/Call Ratio・シラーPER・イールドカーブ等がすべて「取得不可」になり、
+     手入力した値だけが有効という状態になっていた。
+     アプリと data/ は同じ場所に置かれるので、既定で相対パスを見にいく。 */
+  const cands=[];
   const urlEl=document.getElementById('iFundUrl');
-  if(urlEl&&urlEl.value.trim()) url=urlEl.value.trim();
-  if(!url) try{url=localStorage.getItem(CONFIG.fundJsonKey)||'';}catch(e){}
-  if(url){try{localStorage.setItem(CONFIG.fundJsonKey,url);}catch(e){}}
-  if(!url){
-    console.log('fundamentals.json: URL未設定');
-    return null;
+  if(urlEl&&urlEl.value.trim()) cands.push(urlEl.value.trim());
+  try{ const saved=localStorage.getItem(CONFIG.fundJsonKey); if(saved) cands.push(saved); }catch(e){}
+  cands.push('./data/fundamentals.json');      // 既定（同一オリジン）
+  for(const url of cands){
+    try{
+      const r=await fetch(url+(url.includes('?')?'&':'?')+'t='+Date.now(),{cache:'no-store'});
+      if(!r.ok){ console.warn('fundamentals.json取得失敗:',url,r.status); continue; }
+      const j=await r.json();
+      if(!j||!j.indicators){ console.warn('fundamentals.json: indicatorsがありません',url); continue; }
+      console.log('fundamentals.json取得成功:',url,Object.keys(j.indicators).length,'指標');
+      // 手入力欄が空なら、実際に読めたURLを覚えておく
+      if(urlEl&&!urlEl.value.trim()&&url!=='./data/fundamentals.json'){
+        try{localStorage.setItem(CONFIG.fundJsonKey,url);}catch(e){}
+      }
+      return j;
+    }catch(e){ console.warn('fundamentals.json取得エラー:',url,e.message); }
   }
-  console.log('fundamentals.json取得中:',url);
-  try{
-    const r=await fetch(url+'?t='+Date.now());
-    if(!r.ok){console.warn('fundamentals.json取得失敗:',r.status); return null;}
-    const j=await r.json();
-    console.log('fundamentals.json取得成功:',Object.keys(j.indicators||{}).length,'指標');
-    return j;
-  }catch(e){console.warn('fundamentals.json取得エラー:',e.message); return null; }
+  return null;
 }
 
 /* FRED API直接取得 (アプリ内フォールバック用) */
@@ -3582,6 +3590,40 @@ const SUPPLY={
     const t=Date.parse(d+'T00:00:00Z');
     return isNaN(t)?9999:Math.floor((Date.now()-t)/86400000);
   },
+  /* 表示用に、その銘柄の需給の生値をまとめて返す (2026-07-26 追加)。
+     シグナルが立たなくても「取れているか」が画面で分かるようにするため。 */
+  snapshot(symbol,market){
+    if(!this.data) return null;
+    const mk=market==='JP'?'JP':'US';
+    const sym=this.data.symbols?.[symbol]||{};
+    const mkt=this.data.market?.[mk]||{};
+    const rows=[];
+    const push=(label,series,fmt,note)=>{
+      if(!series||!series.length) return;
+      const last=series[series.length-1];
+      const z=this._zOf(series);
+      rows.push({label, value:fmt(last.value), date:last.date, release:last.release,
+                 z:z&&Number.isFinite(z.z)?Math.round(z.z*100)/100:null,
+                 n:series.length, age:this._ageDays(last.date), note});
+    };
+    const pct=v=>(v*100).toFixed(1)+'%';
+    const num=v=>Math.round(v).toLocaleString();
+    push('空売り出来高比率', sym.short_volume_ratio, pct, '米国・日次(FINRA)');
+    push('信用買残', sym.margin_long, num, '日本・週次(JPX)');
+    push('信用売残', sym.margin_short, num, '日本・週次(JPX)');
+    push('信用倍率', sym.margin_ratio, v=>v.toFixed(2)+'倍', '買残÷売残');
+    push('空売り比率(市場全体)', mkt.short_sale_ratio, v=>v.toFixed(1)+'%', '日本・日次(JPX)');
+    const aa=this.data.market?.US?.aaii_spread;
+    if(aa&&aa.length){
+      const last=aa[aa.length-1];
+      rows.push({label:'AAII 強気-弱気', value:(last.value>0?'+':'')+last.value,
+                 date:last.date, z:null, n:aa.length, age:this._ageDays(last.date),
+                 note:'米国個人・週次'});
+    }
+    return rows.length?{rows, symbolFound:Object.keys(sym).length>0,
+                        totalSymbols:this.data.symbol_count||0}:null;
+  },
+
   /* 銘柄の需給を評価する。戻り値は準備度への加点(pt)と内訳。 */
   evaluate(symbol,market){
     const cfg=CONFIG.supply;
@@ -4043,6 +4085,34 @@ function renderResult(result){
         要因どうしは相関するため、合算時は寄与の大きい順に0.6倍ずつ減衰させています(単純加算はしません)。
         これは統計的な傾向であり、個別の予測ではありません。</p>
       </details>` : '';
+    // 需給の現況（シグナルの有無にかかわらず表示する）
+    let supSnapHtml='';
+    try{
+      const snap=SUPPLY.snapshot(result.__supplySymbol,mkt);
+      if(snap){
+        supSnapHtml=`<div style="margin-top:6px;padding-top:6px;border-top:.5px dotted var(--bd)">
+          <div style="font-size:11px;color:var(--t2)">需給データ（バッチ取得・${snap.totalSymbols}銘柄収録）${snap.symbolFound?'':'<span style="color:var(--t3)"> ※この銘柄の個別データは未収録（市場全体の指標のみ）</span>'}</div>
+          ${snap.rows.map(r=>`<div class="edge-row">
+            <span>${r.label}<span style="color:var(--t3)"> ${r.note}</span>${r.age>20?'<span class="edge-tag" style="color:#BA7517;background:rgba(186,117,23,.15)">鮮度低</span>':''}</span>
+            <span style="font-family:var(--mono);white-space:nowrap">${r.value}${r.z!=null?`<span style="color:var(--t3)"> Z${r.z>0?'+':''}${r.z}</span>`:''}</span>
+          </div>`).join('')}
+          <p style="font-size:10px;color:var(--t3);margin-top:3px;line-height:1.5">
+            Zスコアは直近${CONFIG.supply.zWindow}件からの偏差です。件数が少ないうちは参考値です
+            （${snap.rows[0]?.n||0}件）。日付は対象日で、公表はこれより数日遅れます。</p>
+        </div>`;
+      }else if(SUPPLY.data){
+        supSnapHtml=`<div style="margin-top:6px;padding-top:6px;border-top:.5px dotted var(--bd)">
+          <div style="font-size:11px;color:var(--t2)">需給データ</div>
+          <p style="font-size:10.5px;color:var(--t3);line-height:1.5">
+            この銘柄の需給データはまだありません（収録 ${SUPPLY.data.symbol_count||0}銘柄）。
+            米国はFINRAの対象銘柄、日本はJPXの信用取引銘柄が対象です。</p></div>`;
+      }else if(SUPPLY.loaded){
+        supSnapHtml=`<div style="margin-top:6px;padding-top:6px;border-top:.5px dotted var(--bd)">
+          <div style="font-size:11px;color:var(--t2)">需給データ</div>
+          <p style="font-size:10.5px;color:var(--t3);line-height:1.5">
+            未取得です。バッチ（batch/main.py supply）を実行すると表示されます。</p></div>`;
+      }
+    }catch(e){}
     const sup=er.supply;
     const supHtml = (sup&&sup.hits&&sup.hits.length) ? `
       <div style="margin-top:6px;padding-top:6px;border-top:.5px dotted var(--bd)">
@@ -4074,7 +4144,7 @@ function renderResult(result){
         </div>
         <div style="flex:1;min-width:190px">${rows}${volHtml}</div>
       </div>
-      ${supHtml}
+      ${supSnapHtml}${supHtml}
       ${qtHtml}
       <div style="margin-top:9px;padding-top:8px;border-top:.5px solid var(--bd)">
         <div style="font-size:11px;color:var(--t2)">想定保有期間（${mkt==='JP'?'日本株':'米国株'}の実測に基づく）</div>

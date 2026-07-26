@@ -1,0 +1,12 @@
+{
+  "_comment": "需給データ(FINRA空売り出来高)を取得する米国銘柄。watchlist.json とあわせて取得対象になります。ここに追記すれば対象を増やせます。日本株(.T)はJPXのPDFに全銘柄が載るため、ここへの記載は不要です。",
+  "symbols": [
+    "SPY", "QQQ", "IWM", "DIA", "GLD",
+    "AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "TSLA", "AVGO", "AMD", "NFLX",
+    "BRK-B", "JPM", "V", "MA", "UNH", "XOM", "CVX", "LLY", "JNJ", "PG",
+    "COST", "WMT", "HD", "KO", "PEP", "MRK", "ABBV", "CRM", "ORCL", "ADBE",
+    "SOXL", "SOXS", "TQQQ", "SQQQ", "SMH", "XLE", "XLF", "XLK", "XLV", "ARKK",
+    "MU", "INTC", "QCOM", "TXN", "AMAT", "LRCX", "KLAC", "ASML", "TSM", "ARM",
+    "PLTR", "COIN", "MSTR", "RIVN", "LCID", "SOFI", "UPST", "IONQ", "RKLB", "GME"
+  ]
+}

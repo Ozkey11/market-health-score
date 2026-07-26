@@ -81,5 +81,11 @@ jobs:
             exit 0
           fi
           git commit -m "Update market data [skip ci]"
+          # バッチは database/market_data.sqlite も書き換えるが、これはコミット対象外。
+          # 未ステージのまま残ると git pull --rebase が
+          # 「cannot pull with rebase: You have unstaged changes」で失敗するため、
+          # コミット対象外の変更はここで元に戻してから rebase する。
+          git checkout -- . || true
+          git clean -fd database || true
           git pull --rebase origin main
           git push origin main

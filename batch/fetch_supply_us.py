@@ -41,22 +41,45 @@ ALWAYS = ["SPY", "QQQ", "IWM", "DIA"]
 
 
 def _watchlist():
-    """data/watchlist.json から米国銘柄を読む。読めなければ既定値。"""
-    path = os.path.join(os.path.dirname(__file__), "..", "data", "watchlist.json")
-    syms = []
-    try:
-        with io.open(path, encoding="utf-8") as f:
-            for s in json.load(f):
-                s = str(s).strip().upper()
-                # 指数(^GSPC等)と日本株(.T)はFINRAの対象外
-                if not s or s.startswith("^") or s.endswith(".T"):
-                    continue
-                syms.append(s)
-    except Exception:
-        pass
+    """取得対象の米国銘柄を決める。
+
+    2026-07-26 拡張:
+      当初は data/watchlist.json だけを見ていたため13銘柄しか取れていなかった。
+      お気に入りに入れた銘柄が対象外だと需給が永久に表示されないため、
+      data/supply_symbols.json を追加で読むようにした。
+      このファイルに追記すれば、バッチの取得対象を自由に増やせる。
+
+      すべての銘柄(7,000超)を保存しない理由:
+        1日あたり7,000行 × 250営業日 = 175万行となり、
+        配信JSONが実用的な大きさを超えるため。
+    """
+    base = os.path.join(os.path.dirname(__file__), "..", "data")
+    syms, seen = [], set()
+
+    def add(v):
+        v = str(v).strip().upper()
+        # 指数(^GSPC等)と日本株(.T)はFINRAの対象外
+        if not v or v.startswith("^") or v.endswith(".T") or v in seen:
+            return
+        seen.add(v)
+        syms.append(v)
+
+    for fname in ("watchlist.json", "supply_symbols.json"):
+        path = os.path.join(base, fname)
+        try:
+            with io.open(path, encoding="utf-8") as f:
+                data = json.load(f)
+            # 配列でも {"symbols":[...]} でも受け付ける
+            items = data.get("symbols", []) if isinstance(data, dict) else data
+            for v in items:
+                add(v)
+        except FileNotFoundError:
+            continue
+        except Exception as e:
+            print(f"    {fname} の読み込みに失敗: {e}")
+
     for s in ALWAYS:
-        if s not in syms:
-            syms.append(s)
+        add(s)
     return syms
 
 
@@ -130,6 +153,7 @@ def fetch_all_supply_us(conn, run_id, lookback=LOOKBACK_DAYS):
     """直近 lookback 営業日ぶんの未取得分を取りにいく。戻り値 (成功日数, 失敗日数)。"""
     want = set(_watchlist())
     print(f"  対象銘柄: {len(want)}件 ({', '.join(sorted(want)[:10])}{'...' if len(want) > 10 else ''})")
+    print("  ※ 増やす場合は data/supply_symbols.json に銘柄コードを追記してください")
 
     days, cur = [], date.today()
     while len(days) < lookback:

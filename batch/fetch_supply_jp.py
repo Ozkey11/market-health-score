@@ -60,23 +60,86 @@ MAX_WEEKS = 3               # 一度に取りにいく最大本数
 # ══════════════════════════════════════════════════════════
 #  PDF → テキスト
 # ══════════════════════════════════════════════════════════
-def pdf_to_text(data):
-    """PDFのバイト列からテキストを取り出す。
-
-    速度実測(85ページ):
-      pymupdf 0.23秒 / pypdf 3.3秒 / pdfplumber 29.6秒
-    pdfplumberは遅すぎるため使わない。pymupdfがあれば使い、無ければpypdfへ。
-    """
+def _extract_pymupdf(data):
+    """PyMuPDF。1.24以降はモジュール名が pymupdf で、fitz は別名。
+    バージョンによっては fitz が使えないため両方試す。"""
+    mod = None
     try:
-        import fitz  # pymupdf
-        with fitz.open(stream=data, filetype="pdf") as doc:
-            return "\n".join(p.get_text() for p in doc)
+        import pymupdf as mod
     except ImportError:
-        pass
-    except Exception as e:
-        print(f"    pymupdfでの読み取りに失敗、pypdfへ切替: {e}")
+        import fitz as mod
+    doc = mod.open(stream=data, filetype="pdf")
+    try:
+        return "\n".join(p.get_text() for p in doc)
+    finally:
+        try:
+            doc.close()
+        except Exception:
+            pass
+
+
+def _extract_pypdf(data):
     from pypdf import PdfReader
     return "\n".join((p.extract_text() or "") for p in PdfReader(io.BytesIO(data)).pages)
+
+
+def _extract_pdftotext(data):
+    """poppler の pdftotext。-layout で列の並びを保つ。"""
+    import subprocess, tempfile, os as _os
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
+        f.write(data)
+        path = f.name
+    try:
+        r = subprocess.run(["pdftotext", "-layout", "-enc", "UTF-8", path, "-"],
+                           capture_output=True, timeout=300)
+        if r.returncode != 0:
+            raise RuntimeError(r.stderr.decode("utf-8", "replace")[:200])
+        return r.stdout.decode("utf-8", "replace")
+    finally:
+        try:
+            _os.unlink(path)
+        except Exception:
+            pass
+
+
+EXTRACTORS = [("pymupdf", _extract_pymupdf),
+              ("pdftotext", _extract_pdftotext),
+              ("pypdf", _extract_pypdf)]
+
+
+def pdf_to_text(data, want_rows=True):
+    """PDFのバイト列からテキストを取り出す。
+
+    2026-07-26 修正:
+      当初は pymupdf を試して失敗したら pypdf、という一本道だった。
+      しかし pypdf は本PDFで語と語の間の空白を落とすことがあり、
+      解析結果が0件になってしまう事故が起きた（GitHub Actions実測）。
+      そこで複数の方式を試し、「実際に何銘柄取れたか」で最良のものを選ぶ。
+
+    速度実測(85ページ): pymupdf 0.23秒 / pdftotext 0.25秒 / pypdf 3.3秒
+    """
+    best_txt, best_n, best_name, errors = "", -1, None, []
+    for name, fn in EXTRACTORS:
+        try:
+            txt = fn(data)
+        except Exception as e:
+            errors.append(f"{name}: {type(e).__name__}: {e}")
+            continue
+        if not txt:
+            errors.append(f"{name}: 空のテキスト")
+            continue
+        n = len(set(m.group("code") for m in ROW_CURRENT.finditer(txt))) if want_rows else len(txt)
+        n2 = len(set(m.group("code") for m in ROW_2026.finditer(txt))) if want_rows else 0
+        n = max(n, n2)
+        print(f"      抽出 {name}: {len(txt):,}文字 / 銘柄{n}件")
+        if n > best_n:
+            best_txt, best_n, best_name = txt, n, name
+        if want_rows and n >= 1000:
+            break            # 十分取れていれば他は試さない
+    if best_name is None:
+        raise RuntimeError("PDFからテキストを取り出せませんでした: " + " / ".join(errors))
+    print(f"      → {best_name} を採用")
+    return best_txt
 
 
 # ══════════════════════════════════════════════════════════
@@ -86,11 +149,14 @@ def pdf_to_text(data):
 #   例: B タマホーム　普通株式 14190 JP3470900006 1,224,600 ▲ 8,900 234,000 ▲ 3,800 523,900 ...
 #   列: 売残高 前週比 買残高 前週比 (以降は内訳)
 #   ※ 社名とコードが空白なしで繋がる行、外国籍ETF(US/SG/JE始まりのISIN)もある
+# 区切りの空白は抽出方式によって失われることがあるため [ \u3000]* と緩めにする。
+# 単位コードの直前は行頭・空白・数字のほか「銘柄」等の文字が来ることもある
+# (例: 「プライム Prime 1479 銘柄B 極洋　普通株式 13010 ...」)。
 ROW_CURRENT = re.compile(
-    r'(?:^|[\s\d])(?P<unit>[ABCJKMTF])[ \u3000]+'
+    r'(?:^|[\s\d]|銘柄)(?P<unit>[ABCJKMTF])[ \u3000]+'
     r'(?P<name>.{2,60}?)[ \u3000]*'
-    r'(?P<code>[0-9][0-9A-Z]{4})[ \u3000]+'
-    r'(?P<isin>[A-Z]{2}[0-9A-Z]{10})[ \u3000]+'
+    r'(?P<code>[0-9][0-9A-Z]{4})[ \u3000]*'
+    r'(?P<isin>[A-Z]{2}[0-9A-Z]{10})[ \u3000]*'
     r'(?P<sell>[\d,]+)[ \u3000]+(?P<sc>▲[ \u3000]*)?(?P<scv>[\d,]+)[ \u3000]+'
     r'(?P<buy>[\d,]+)[ \u3000]+(?P<bc>▲[ \u3000]*)?(?P<bcv>[\d,]+)'
 )
@@ -250,7 +316,11 @@ def fetch_all_supply_jp(conn, run_id, max_files=MAX_WEEKS):
             as_of = as_of or iso_guess
             exp = expected_count(text)
             if not rows:
-                raise ValueError("1銘柄も解析できませんでした（様式変更の可能性）")
+                # 何が取れていたのか分からないと直しようがないので先頭を出す
+                head = " ".join(text[:400].split())
+                print(f"      抽出テキストの先頭: {head}")
+                raise ValueError("1銘柄も解析できませんでした（様式変更の可能性）"
+                                 f" 先頭: {head[:150]}")
             if exp and len(rows) < exp * 0.9:
                 # 9割を下回るなら解析漏れとみなし、警告として残す
                 log_quality(conn, run_id, f"supply_jp:{as_of}", "stale",

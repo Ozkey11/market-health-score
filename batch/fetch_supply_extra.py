@@ -45,7 +45,14 @@ from db import upsert_supply, log_quality
 from sources import link_for
 
 JP_LIST_URL = "https://www.jpx.co.jp/markets/statistics-equities/short-selling/index.html"
-AAII_URL = "https://www.aaii.com/sentimentsurvey"
+# 2026-07-26 修正: 公開トップページだけでは読めないことがあるため複数試す
+AAII_URLS = [
+    "https://www.aaii.com/sentimentsurvey/sent_results",
+    "https://www.aaii.com/sentimentsurvey",
+    "https://en.macromicro.me/charts/20828/us-aaii-sentimentsurvey",
+    "https://en.macromicro.me/charts/116484/us-aaii-investor-sentiment-survey",
+]
+AAII_URL = AAII_URLS[0]
 UA = "market-health-score/1.0 (personal research)"
 MAX_FILES = 10
 
@@ -139,7 +146,7 @@ def fetch_jp_short_ratio(conn, run_id, max_files=MAX_FILES):
         if _have(conn, "JP", guess, "short_sale_ratio"):
             continue
         try:
-            text = pdf_to_text(_fetch(url))
+            text = pdf_to_text(_fetch(url), want_rows=False)
             r = parse_short_selling_pdf(text)
             if not r:
                 raise ValueError("集計行を解析できませんでした")
@@ -207,19 +214,31 @@ def _last_thursday():
 
 
 def fetch_aaii(conn, run_id):
-    """AAIIの最新週を取得する。戻り値 (成功数, 失敗数)。"""
-    try:
-        html = _fetch(AAII_URL, timeout=30).decode("utf-8", errors="replace")
-    except Exception as e:
-        log_quality(conn, run_id, "aaii", "failed",
-                    f"{type(e).__name__}: {e}（全期間データは会員限定のため手動取り込みも可）",
-                    AAII_URL)
-        return 0, 1
-    vals = parse_aaii_html(html)
+    """AAIIの最新週を取得する。戻り値 (成功数, 失敗数)。
+
+    2026-07-26 修正:
+      公開トップページ1本だけを見ていたが、体裁変更で読み取れなくなった。
+      公式の結果ページとMacroMicroのミラーを含め、順に試すようにする。
+    """
+    vals, used, errs = None, None, []
+    for url in AAII_URLS:
+        try:
+            html = _fetch(url, timeout=30).decode("utf-8", errors="replace")
+        except Exception as e:
+            errs.append(f"{url}: {type(e).__name__}")
+            continue
+        v = parse_aaii_html(html)
+        if v:
+            vals, used = v, url
+            break
+        errs.append(f"{url}: 数値を読み取れず")
     if not vals:
         log_quality(conn, run_id, "aaii", "failed",
-                    "ページから数値を読み取れませんでした（体裁変更の可能性）", AAII_URL)
+                    "いずれの取得先からも読み取れませんでした（" + " / ".join(errs[:3])
+                    + "）。全期間データは会員限定のため import_supply_history.py --aaii で手動取り込み可",
+                    AAII_URLS[0])
         return 0, 1
+    print(f"    取得先: {used}")
     d = _last_thursday()
     if _have(conn, "US", d, "aaii_bull"):
         print("    最新週は取得済みです")
