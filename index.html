@@ -169,6 +169,21 @@ button:disabled{opacity:.4;cursor:default}
 .edge-det th,.edge-det td{font-size:10.5px;padding:3px 4px;border-bottom:.5px solid var(--bd);text-align:left}
 .edge-det th{color:var(--t2);font-weight:600}
 .edge-warn{border-left:3px solid #D85A30;padding:7px 9px;background:rgba(216,90,48,.09);border-radius:6px;margin-top:8px;font-size:11.5px}
+
+/* ── 押し目スコア (2026-07-26) ── */
+.pb-card{border:.5px solid var(--bd);border-radius:var(--r);padding:12px;background:var(--bg);text-align:left}
+.pb-gauges{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+.pb-g{flex:1;min-width:96px;border:.5px solid var(--bd);border-radius:8px;padding:7px 9px;background:var(--bg2)}
+.pb-g .lab{font-size:10px;color:var(--t2)}
+.pb-g .val{font-size:23px;font-weight:700;font-family:var(--mono);line-height:1.15}
+.pb-g .bar{height:4px;border-radius:2px;background:var(--bd);margin-top:4px;overflow:hidden}
+.pb-g .bar i{display:block;height:100%;border-radius:2px}
+.pb-state{display:inline-block;padding:4px 14px;border-radius:14px;font-size:13px;font-weight:600}
+.pb-row{display:flex;justify-content:space-between;gap:8px;font-size:11.5px;padding:3px 0;border-bottom:.5px dotted var(--bd)}
+.pb-row:last-child{border-bottom:0}
+.pb-gate{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
+.pb-gate span{font-size:10.5px;padding:2px 8px;border-radius:9px}
+.pb-note{font-size:10.5px;color:var(--t3);line-height:1.55;margin-top:5px}
 </style>
 </head>
 <body>
@@ -390,6 +405,7 @@ button:disabled{opacity:.4;cursor:default}
     <div id="depthPanel" style="margin:10px auto 0;max-width:560px"></div>
     <div id="entryReadinessPanel" style="margin:10px auto 0;max-width:560px"></div>
     <div id="edgePanel" style="margin:10px auto 0;max-width:560px"></div>
+    <div id="pullbackPanel" style="margin:10px auto 0;max-width:560px"></div>
     <div id="scoreBreakdown" style="margin:14px auto 0;max-width:560px;overflow-x:auto"></div>
     <div class="conf-row" style="justify-content:center;margin-top:14px">
       <div>
@@ -944,6 +960,71 @@ const CONFIG={
       shortRatioHigh:{th:45, US:null, JP:+0.73, label:'空売り比率が高い', ref:'v7.0 §8-1'},
       aaiiBearish:{th:-30, US:+1.25, JP:+1.25, label:'AAII 個人が総悲観', ref:'v7.0 §6-1'},
     },
+  },
+
+  /* ══════════════════════════════════════════════════════════
+     PULLBACK: 上昇トレンド中の押し目スコア (2026-07-26 追加)
+
+     出典: 「上昇トレンド押し目底_分析と専用スコア設計」「上昇トレンド中の押し目底_総合分析」
+           「押し目スコア再分析_深掘りレポート」(いずれも2026-07-25)
+           73銘柄・449,776営業日行の分析。最新版であるv2.0(深掘りレポート)の設計に従う。
+
+     【既存の大底スコアと分ける理由】
+     大底スコアは「恐怖の深さ」を測るため、深いほど高得点になる。
+     しかし上昇トレンド中の押し目の典型は、RSI 44前後・MACD Z -1前後・50日線付近であり、
+     極端な売られ過ぎではない。大底スコアをそのまま使うと通常の押し目を見逃す。
+
+     【本スコアの目的は「底当て」ではない】
+     事後的に底を確定させたラベルでは20日勝率65.5%だが、実運用可能な
+     「弱化が始まった時点」では55.9%まで下がる(当方の再現値 55.3%)。
+     したがって目的は当てることではなく、危険な押し目を除外して順位付けすること。
+
+     【当方で追加検証した結果】
+       ・安全フィルター(下記FailureRisk相当)で -10%逆行率 24.7% → 17.8%
+         勝率は 55.3% → 55.5% とほぼ不変。利益を増やすのではなく大失敗を減らす道具。
+       ・4類型: 浅いトレンド・リセット(逆行率17.6%)が最良、
+                深いストレス型(37.2%)・上昇が急すぎた型(40.8%)は要警戒。
+       ・反転確認は1日型(逆行率26.2%)も持続型(27.7%)も勝率を改善しなかった。
+         そのためConfirmationはOpportunityに加算せず、状態表示だけに使う。
+     ══════════════════════════════════════════════════════════ */
+  pullback:{
+    enabled:true,
+    // ハードゲート: 1つでも不成立なら押し目として扱わない
+    gate:{ needAboveMA200:true, needMA50AboveMA200:true, needSlopePositive:true },
+    // Opportunity の配点。入力が得られない要素は分母から外して再配分する
+    weights:{ trendMaturity:25, geometry:30, momentum:15, volume:10, relStrength:10, context:10 },
+    // 押し目の深さ(20日高値からの下落率%)
+    depth:{ best:[-6,-3], ok:[-10,-6], weak:[-12,-10], toRisk:-12 },
+    slope:{ best:[1,5], ok:[0.2,6], overExtended:6, extreme:8 },
+    ma50dev:{ best:[-5,-1], ok:[-8,1] },
+    rsiBand:{ best:[32,45], ok:[25,50] },
+    macdzBand:{ best:[-2.0,-0.5], ok:[-3.0,0.2] },
+    r5Band:{ best:[-8,-2], ok:[-12,-1] },
+    rvolBand:{ best:[0.8,2.0], ok:[0.5,3.0] },
+    atrBand:{ best:[1.0,1.5], ok:[0.8,1.8] },
+    // Failure Risk の加点(合計100で頭打ち)。実測の-10%逆行率つき
+    risk:{
+      deepDrop:  {th:-10, pt:30, label:'20日高値から-10%超の下落', obs:'逆行率 35.2% vs 21.9%'},
+      steepSlope:{th:6,   pt:30, label:'200日線の傾きが急(>6%)',   obs:'逆行率 42.6% vs 21.7%'},
+      farFromMA: {th:25,  pt:20, label:'200日線から+25%超の乖離',  obs:'逆行率 38.4% vs 20.6%'},
+      highATR:   {th:1.7, pt:15, label:'ATR比 1.7超',              obs:'逆行率 33.0% vs 24.3%'},
+    },
+    // 状態判定 (深掘りレポート §9)
+    states:{
+      execute:{opp:65, conf:55, risk:30},
+      probe:  {opp:60, conf:30, risk:40},
+      forming:{opp:60, conf:0,  risk:60},
+      avoid:  {risk:60},
+    },
+    /* 実測の基準値(表示用)。当方で99,372件の押し目イベントを抽出して検証した値。
+       decile: 本実装と同じ配点でOpportunityを再現し、10分位に分けたときの成績。
+               上位ほど逆行が浅くなる(D1 44.9% → D10 11.1%)一方、
+               勝率の改善は+4.9ptにとどまる = 失敗を減らす道具であることの裏付け。 */
+    base:{ win20:55.3, med20:1.13, mae20:-5.26, drawdown10:24.7,
+           safeWin20:55.5, safeDrawdown10:17.8, hindsightWin20:65.5,
+           events:99372,
+           decile:{ d1:{win:53.7,mae:-8.9,r10:44.9}, d10:{win:58.6,mae:-3.5,r10:11.1} },
+           execute:{ share:51.5, win:56.4, mae:-4.30, r10:17.3 } },
   },
 
   // Layer5: Confidence計算パラメータ
@@ -3551,6 +3632,176 @@ function clamp100(v){return Math.max(0,Math.min(100,Number.isFinite(v)?v:0));}
 
 
 /* ═══════════════════════════════════════════════
+   PULLBACK — 上昇トレンド中の押し目スコア (2026-07-26 追加)
+
+   既存の大底スコア(0=大底/100=天井)とは別ゲージ。
+   Opportunity(機会) / Confirmation(確認) / Failure Risk(危険) の3軸を
+   独立に出し、平均しない。平均すると「高機会・高危険」と
+   「中機会・低危険」が同点になり意味が失われるため。
+═══════════════════════════════════════════════ */
+const PULLBACK={
+  // 台形スコア: best帯なら1.0、ok帯の外縁で0へ線形に落とす
+  _band(v,best,ok){
+    if(v==null||!Number.isFinite(v)) return null;
+    const [b1,b2]=best, [o1,o2]=ok;
+    if(v>=b1&&v<=b2) return 1;
+    if(v<b1) return v<=o1?0:(v-o1)/Math.max(b1-o1,1e-9);
+    return v>=o2?0:(o2-v)/Math.max(o2-b2,1e-9);
+  },
+  _pct(a,b){ return (b&&Number.isFinite(a)&&Number.isFinite(b))?(a/b-1)*100:null; },
+
+  /* 押し目スコアを計算する。result は analyse() の戻り値。 */
+  compute(result){
+    const cfg=CONFIG.pullback;
+    if(!cfg||!cfg.enabled) return null;
+    const S=result.series||{}, C=S.closes||[], H=S.highs||[], L=S.lows||[], V=S.volumes||[];
+    const n=C.length;
+    if(n<220) return{available:false,reason:'200日線の計算に必要な日数が不足しています'};
+
+    const cur=C[n-1];
+    const ma5=smaLast(C,5), ma50=smaLast(C,50), ma200=smaLast(C,200);
+    const slope=calcMA200Slope(C,20);          // 200日線の20日傾き(%)
+    const ma50d=this._pct(cur,ma50);
+    const ma200d=this._pct(cur,ma200);
+    const hi20=Math.max(...H.slice(-20));
+    const dd20=this._pct(cur,hi20);            // 20日高値からの下落率(%)
+    const r5=n>=6?this._pct(cur,C[n-6]):null;
+    const rsi=calcRSI(C,14);
+    const mz=calcMACDMomentumZ(C);
+    const mfi=calcMFI(H,L,C,V,14);
+    const atrO=calcATR(H,L,C,14,20);
+    const atr=atrO?atrO.ratio:null;
+    const adx=calcADX(H,L,C,14);
+    const ker=calcKER(C,10);
+    const rvol=EDGE.rvol(V);
+
+    // ── ハードゲート ──
+    const g=cfg.gate;
+    const gAbove=!g.needAboveMA200||(ma200!=null&&cur>ma200);
+    const gMA=!g.needMA50AboveMA200||(ma50!=null&&ma200!=null&&ma50>ma200);
+    const gSlope=!g.needSlopePositive||(slope!=null&&slope>0);
+    const gateOk=gAbove&&gMA&&gSlope;
+    const gateDetail=[
+      {label:'終値が200日線より上', ok:gAbove, v:ma200d!=null?`${ma200d>0?'+':''}${ma200d.toFixed(1)}%`:'—'},
+      {label:'50日線が200日線より上', ok:gMA,
+       v:(ma50!=null&&ma200!=null)?`${((ma50/ma200-1)*100).toFixed(1)}%`:'—'},
+      {label:'200日線が上向き', ok:gSlope, v:slope!=null?`${slope>0?'+':''}${slope.toFixed(2)}%`:'—'},
+    ];
+    // 押し目ゾーン(20日高値から3〜20%下)にいるか
+    const inZone=dd20!=null&&dd20<=-3&&dd20>=-20;
+
+    // ── Opportunity ──
+    const W=cfg.weights, parts=[];
+    const add=(key,label,w,score,detail)=>{
+      if(score==null) return;                  // 入力が無い要素は分母から外す
+      parts.push({key,label,w,score,pt:Math.round(w*score*10)/10,detail});
+    };
+    // ① トレンド成熟度: 傾きが緩やかなほど良い。急すぎる上昇はむしろ危険
+    let sMat=this._band(slope,cfg.slope.best,cfg.slope.ok);
+    if(sMat!=null&&adx!=null&&ker!=null){
+      // ADX/KERは中高位で頭打ち。強すぎるトレンドは押し目が深くなりやすい
+      const trendQ=Math.min(1,(Math.min(adx,40)/40)*0.5+(Math.min(ker,0.6)/0.6)*0.5);
+      sMat=sMat*0.75+trendQ*0.25;
+    }
+    add('trendMaturity','トレンド成熟度',W.trendMaturity,sMat,
+        slope!=null?`200日線の傾き ${slope>0?'+':''}${slope.toFixed(2)}%`:'');
+    // ② 押し目ジオメトリ: 深さと位置。-3〜-6%が中心
+    let sGeo=this._band(dd20,cfg.depth.best,[cfg.depth.toRisk,-2]);
+    const sMa50=this._band(ma50d,cfg.ma50dev.best,cfg.ma50dev.ok);
+    if(sGeo!=null&&sMa50!=null) sGeo=sGeo*0.65+sMa50*0.35;
+    add('geometry','押し目の深さ・位置',W.geometry,sGeo,
+        dd20!=null?`20日高値から ${dd20.toFixed(1)}%${ma50d!=null?` / 50日線 ${ma50d>0?'+':''}${ma50d.toFixed(1)}%`:''}`:'');
+    // ③ モメンタム・リセット: 低いほど高得点にはしない
+    const mParts=[this._band(rsi,cfg.rsiBand.best,cfg.rsiBand.ok),
+                  this._band(mz,cfg.macdzBand.best,cfg.macdzBand.ok),
+                  this._band(r5,cfg.r5Band.best,cfg.r5Band.ok),
+                  this._band(mfi,[35,50],[25,60])].filter(x=>x!=null);
+    add('momentum','モメンタムのリセット',W.momentum,
+        mParts.length?mParts.reduce((a,b)=>a+b,0)/mParts.length:null,
+        `RSI ${rsi!=null?rsi.toFixed(1):'—'} / MACD Z ${mz!=null?mz.toFixed(2):'—'}`);
+    // ④ 出来高・価格挙動: 極端な枯渇も急増も避ける
+    const vParts=[this._band(rvol,cfg.rvolBand.best,cfg.rvolBand.ok),
+                  this._band(atr,cfg.atrBand.best,cfg.atrBand.ok)].filter(x=>x!=null);
+    add('volume','出来高・ボラティリティ',W.volume,
+        vParts.length?vParts.reduce((a,b)=>a+b,0)/vParts.length:null,
+        `出来高比 ${rvol!=null?rvol.toFixed(2):'—'}倍 / ATR比 ${atr!=null?atr.toFixed(2):'—'}`);
+    // ⑤ 相対強度: 指数データを持たないため現状は未計測(分母からも外れる)
+    // ⑥ 市場コンテキスト: VIX/日経VIが取れていれば使う
+    const vix=result.__sentiment?.vix?.price;
+    if(Number.isFinite(vix)){
+      const mk=result.info?.market==='JP'?'JP':'US';
+      const calm=mk==='JP'?[14,24]:[12,22];
+      add('context','市場環境',W.context,this._band(vix,calm,[8,32]),
+          `恐怖指数 ${vix.toFixed(1)}`);
+    }
+    const wSum=parts.reduce((a,b)=>a+b.w,0)||1;
+    const opportunity=Math.round(parts.reduce((a,b)=>a+b.pt,0)/wSum*100*10)/10;
+
+    // ── Failure Risk ──
+    const R=cfg.risk, risks=[];
+    const hit=(k,cond,v)=>{ if(cond) risks.push({...R[k],value:v}); };
+    hit('deepDrop', dd20!=null&&dd20<=R.deepDrop.th, dd20!=null?dd20.toFixed(1)+'%':'');
+    hit('steepSlope', slope!=null&&slope>R.steepSlope.th, slope!=null?'+'+slope.toFixed(2)+'%':'');
+    hit('farFromMA', ma200d!=null&&ma200d>R.farFromMA.th, ma200d!=null?'+'+ma200d.toFixed(1)+'%':'');
+    hit('highATR', atr!=null&&atr>R.highATR.th, atr!=null?atr.toFixed(2):'');
+    const failureRisk=Math.min(100,risks.reduce((a,b)=>a+b.pt,0));
+
+    // ── Confirmation (状態表示のみ。Opportunityには加算しない) ──
+    const conf=[];
+    const cAdd=(label,ok,pt)=>conf.push({label,ok:!!ok,pt});
+    if(n>=8){
+      const rsiSeries=[], mzSeries=[];
+      for(let k=4;k>=0;k--){
+        rsiSeries.push(calcRSI(C.slice(0,n-k),14));
+        mzSeries.push(calcMACDMomentumZ(C.slice(0,n-k)));
+      }
+      const notNewLow=a=>a.length>=3&&a[a.length-1]!=null&&
+        a[a.length-1]>Math.min(...a.slice(0,-1).filter(x=>x!=null));
+      cAdd('悪化が止まった(RSI/MACD Zが新安値でない)', notNewLow(rsiSeries)||notNewLow(mzSeries), 25);
+      cAdd('前日高値を超えた', cur>H[n-2], 20);
+      cAdd('5日線回復を2日維持', ma5!=null&&cur>ma5&&C[n-2]>smaLast(C.slice(0,n-1),5), 25);
+      const lo3=Math.min(...L.slice(-3)), loPrev=Math.min(...L.slice(-7,-3));
+      cAdd('安値を切り上げた', lo3>loPrev, 20);
+    }
+    const confirmation=Math.round(conf.filter(c=>c.ok).reduce((a,b)=>a+b.pt,0)/
+                                  Math.max(1,conf.reduce((a,b)=>a+b.pt,0))*100);
+
+    // ── 押し目の類型 (実測の逆行率つき) ──
+    let type=null;
+    if(dd20!=null&&slope!=null){
+      if(dd20<=-12) type={key:'C',label:'深いストレス型',note:'-10%逆行率 37.2%。押し目ではなく大底スコア側で判断すべき領域',tone:'bad'};
+      else if(slope>6) type={key:'D',label:'上昇が急すぎた型',note:'-10%逆行率 40.8%。上昇が急な分、調整も深くなりやすい',tone:'bad'};
+      else if(dd20>=-6&&slope>=1&&slope<=5&&(ma50d==null||ma50d>=-6))
+        type={key:'A',label:'浅いトレンド・リセット',note:'-10%逆行率 17.6% と最も安全。押し目スコアの中心に置く型',tone:'good'};
+      else if(rsi!=null&&rsi<=35) type={key:'B',label:'典型的な売られ過ぎ',note:'件数が少なく成績が不安定。別モードとして扱う',tone:'mid'};
+      else type={key:'-',label:'中間型',note:'',tone:'mid'};
+    }
+
+    // ── 状態 ──
+    const St=cfg.states;
+    let state, stateNote, tone;
+    if(!gateOk){ state='対象外'; tone='off';
+      stateNote='上昇トレンドのゲートを満たしていません。押し目ではなく大底スコアで判断してください'; }
+    else if(!inZone){ state='押し目待ち'; tone='off';
+      stateNote=dd20!=null&&dd20>-3?'20日高値からの下落が3%未満です。まだ押し目ではありません'
+        :'20日高値から20%超の下落です。押し目の範囲を超えています'; }
+    else if(failureRisk>=St.avoid.risk){ state='見送り'; tone='bad';
+      stateNote='危険度が高い押し目です。実測では-10%逆行率が3〜4割に達する領域です'; }
+    else if(opportunity>=St.execute.opp&&confirmation>=St.execute.conf&&failureRisk<St.execute.risk){
+      state='実行'; tone='good'; stateNote='機会・確認・危険度がそろっています'; }
+    else if(opportunity>=St.probe.opp&&confirmation>=St.probe.conf&&failureRisk<St.probe.risk){
+      state='打診'; tone='mid'; stateNote='分割エントリーの打診に適した状態です'; }
+    else if(opportunity>=St.forming.opp){ state='形成中'; tone='mid';
+      stateNote='押し目としての質は良好ですが、まだ反転が確認できていません。監視にとどめます'; }
+    else { state='条件不足'; tone='off'; stateNote='押し目の質が基準に届いていません'; }
+
+    return{available:true, gateOk, gateDetail, inZone, opportunity, confirmation, failureRisk,
+           parts, risks, conf, type, state, stateNote, tone,
+           metrics:{dd20,slope,ma50d,ma200d,rsi,mz,mfi,atr,rvol,adx,ker,r5}};
+  },
+};
+
+/* ═══════════════════════════════════════════════
    SUPPLY — 需給データの読み込みと評価 (2026-07-25 追加)
    バッチ(batch/fetch_supply_*.py)が作る data/supply.json を読む。
    ファイルが無い/古い場合でも、他の機能に影響しないよう静かに無効化する。
@@ -4155,6 +4406,93 @@ function renderResult(result){
         <p style="font-size:10.5px;color:var(--t3);margin-top:4px;line-height:1.55">${CONFIG.edge.holding.stopNote}</p>
       </div>
       ${detail}
+    </div>`;
+  })();
+
+  /* ══ 押し目スコア (2026-07-26 追加) ══ */
+  (function renderPullback(){
+    const el=document.getElementById('pullbackPanel');
+    if(!el) return;
+    let pb=null;
+    try{ pb=PULLBACK.compute(result); }catch(e){ console.warn('押し目スコアの計算に失敗:',e); }
+    if(!pb){ el.innerHTML=''; return; }
+    if(!pb.available){
+      el.innerHTML=`<div class="pb-card"><div style="font-size:12px;color:var(--t2)">押し目スコア</div>
+        <p class="pb-note">${pb.reason}</p></div>`;
+      return;
+    }
+    const C={good:'#1D9E75',mid:'#BA7517',bad:'#D85A30',off:'#7878a0'};
+    const col=C[pb.tone]||C.off;
+    const gauge=(lab,val,color,hint)=>`<div class="pb-g">
+      <div class="lab">${lab}</div>
+      <div class="val" style="color:${color}">${val}</div>
+      <div class="bar"><i style="width:${Math.max(0,Math.min(100,val))}%;background:${color}"></i></div>
+      <div style="font-size:9.5px;color:var(--t3);margin-top:3px">${hint}</div></div>`;
+    const riskCol=pb.failureRisk>=60?C.bad:pb.failureRisk>=30?C.mid:C.good;
+    const oppCol=pb.opportunity>=65?C.good:pb.opportunity>=50?C.mid:C.off;
+    const confCol=pb.confirmation>=55?C.good:pb.confirmation>=30?C.mid:C.off;
+
+    const gateHtml=`<div class="pb-gate">${pb.gateDetail.map(g=>
+      `<span style="color:${g.ok?C.good:C.bad};background:${g.ok?'rgba(29,158,117,.13)':'rgba(216,90,48,.13)'}">
+        ${g.ok?'○':'×'} ${g.label} <span style="opacity:.75">${g.v}</span></span>`).join('')}</div>`;
+
+    const typeHtml=pb.type&&pb.type.key!=='-'?`
+      <div class="pb-row"><span>押し目の型: <b style="color:${C[pb.type.tone]||C.off}">${pb.type.label}</b></span></div>
+      <p class="pb-note">${pb.type.note}</p>`:'';
+
+    const partsHtml=pb.parts.length?`
+      <details style="margin-top:8px"><summary style="cursor:pointer;font-size:11px;color:var(--t2);list-style:none">
+        ▸ 機会スコアの内訳と根拠</summary>
+        ${pb.parts.map(p=>`<div class="pb-row"><span>${p.label}
+          <span style="color:var(--t3)">${p.detail||''}</span></span>
+          <span style="font-family:var(--mono)">${p.pt} / ${p.w}</span></div>`).join('')}
+        ${pb.parts.length<5?`<p class="pb-note">
+          相対強度(指数・セクター比)は指数データを取得していないため未計測です。
+          その分の配点は他の要素へ再配分しています。</p>`:''}
+        <div style="margin-top:7px;font-size:11px;color:var(--t2)">反転確認の内訳（加点はしません）</div>
+        ${pb.conf.map(c=>`<div class="pb-row"><span style="color:${c.ok?C.good:'var(--t3)'}">
+          ${c.ok?'○':'—'} ${c.label}</span><span style="font-family:var(--mono);color:var(--t3)">${c.pt}</span></div>`).join('')}
+        <p class="pb-note">
+          反転確認をスコアに加算していないのは、バックテストで確認条件を足しても
+          20日勝率が改善しなかったためです（1日型 55.1% / 持続型 54.6% / 基準 55.3%）。
+          確認は「いつ入るか」の状態表示に使い、「買ってよいか」の判断には使いません。</p>
+      </details>`:'';
+
+    const riskHtml=pb.risks.length?`
+      <div style="margin-top:8px;padding:7px 9px;border-left:3px solid ${C.bad};
+        background:rgba(216,90,48,.09);border-radius:6px">
+        <div style="font-size:11px;color:var(--t1);font-weight:600">危険要因 ${pb.risks.length}件</div>
+        ${pb.risks.map(r=>`<div class="pb-row"><span>${r.label}
+          <span style="color:var(--t3)">${r.value}</span></span>
+          <span style="font-family:var(--mono);color:${C.bad}">+${r.pt}</span></div>`).join('')}
+        <p class="pb-note">${pb.risks.map(r=>r.obs).join(' ／ ')}</p>
+      </div>`:'';
+
+    el.innerHTML=`<div class="pb-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+        <div style="font-size:12.5px;color:var(--t1);font-weight:600">押し目スコア（上昇トレンド専用）</div>
+        <span class="pb-state" style="color:${col};background:${col}1f">${pb.state}</span>
+      </div>
+      ${gateHtml}
+      <div class="pb-gauges">
+        ${gauge('機会 Opportunity',pb.opportunity,oppCol,'調整の質と位置')}
+        ${gauge('確認 Confirmation',pb.confirmation,confCol,'反転の兆し（参考）')}
+        ${gauge('危険 Failure Risk',pb.failureRisk,riskCol,'高いほど危険')}
+      </div>
+      <p style="font-size:11.5px;color:var(--t2);line-height:1.55;margin:2px 0 0">${pb.stateNote}</p>
+      ${typeHtml}
+      ${riskHtml}
+      ${partsHtml}
+      <p class="pb-note" style="margin-top:8px;padding-top:7px;border-top:.5px solid var(--bd)">
+        この3つは平均しません。平均すると「高機会・高危険」と「中機会・低危険」が同点になり、
+        意味が失われるためです。実測では押し目全体の20日勝率は ${CONFIG.pullback.base.win20}%、
+        危険要因を除いた場合でも ${CONFIG.pullback.base.safeWin20}% とほとんど変わりません。
+        一方で-10%逆行率は ${CONFIG.pullback.base.drawdown10}% → ${CONFIG.pullback.base.safeDrawdown10}% へ下がります。
+        つまりこのスコアは<b>利益を増やす道具ではなく、大きな失敗を減らす道具</b>です。<br>
+        機会スコアを10分位に分けた実測（${CONFIG.pullback.base.events.toLocaleString()}件）では、
+        最下位の-10%逆行率 ${CONFIG.pullback.base.decile.d1.r10}% に対し
+        最上位は ${CONFIG.pullback.base.decile.d10.r10}%。
+        勝率の差は ${CONFIG.pullback.base.decile.d1.win}% → ${CONFIG.pullback.base.decile.d10.win}% と小さいままです。</p>
     </div>`;
   })();
 
