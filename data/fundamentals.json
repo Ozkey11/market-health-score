@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-07-26T03:24:43.850144+00:00",
+  "updated_at": "2026-07-26T10:11:42.523601+00:00",
   "indicators": {
     "hy_spread": {
       "value": 2.77,
@@ -30,13 +30,13 @@
       "source": "Yahoo CL=F"
     },
     "copper": {
-      "value": 6.32,
-      "z": 1.245,
+      "value": 6.3575,
+      "z": 1.304,
       "source": "Yahoo HG=F"
     },
     "dxy": {
-      "value": 101.47,
-      "z": 2.309,
+      "value": 101.43,
+      "z": 2.303,
       "source": "Yahoo DX-Y.NYB"
     },
     "pcr": {
