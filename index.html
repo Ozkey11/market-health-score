@@ -252,8 +252,17 @@ button:disabled{opacity:.4;cursor:default}
     Yahoo Finance: ^GSPC, ^N225, AAPL, 7203.T など　|　Alpha Vantage: AAPL, MSFT, SPY など（指数コードは非対応・ETFで代替）
   </p>
   <div id="favBar" style="display:none;margin-top:8px;padding-top:8px;border-top:.5px solid var(--bd)">
-    <span style="font-size:11px;color:var(--t2)">★ お気に入り</span>
-    <div id="favChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px"></div>
+    <button id="favToggle" style="display:flex;align-items:center;gap:6px;width:100%;background:none;
+      border:0;padding:0;cursor:pointer;color:var(--t2);font-size:11px;font-family:inherit;text-align:left">
+      <span id="favArrow">▾</span><span>★ お気に入り</span>
+      <span id="favCount" style="color:var(--t3);font-size:10px"></span>
+      <span style="flex:1"></span>
+      <span id="favHint" style="color:var(--t3);font-size:10px">タップで折りたたむ</span>
+    </button>
+    <div id="favChipsWrap">
+      <div id="favChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"></div>
+      <div id="favMore" style="margin-top:5px"></div>
+    </div>
   </div>
   <div id="historyWrap" style="display:none;margin-top:10px;padding-top:10px;border-top:.5px solid var(--bd)">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
@@ -404,8 +413,10 @@ button:disabled{opacity:.4;cursor:default}
     <div id="zoneNote" style="font-size:11px;color:var(--t3);margin-top:6px"></div>
     <div id="depthPanel" style="margin:10px auto 0;max-width:560px"></div>
     <div id="entryReadinessPanel" style="margin:10px auto 0;max-width:560px"></div>
+    <div id="provPanel" style="margin:8px auto 0;max-width:560px"></div>
     <div id="edgePanel" style="margin:10px auto 0;max-width:560px"></div>
     <div id="pullbackPanel" style="margin:10px auto 0;max-width:560px"></div>
+    <div id="wisdomPanel" style="margin:10px auto 0;max-width:560px"></div>
     <div id="scoreBreakdown" style="margin:14px auto 0;max-width:560px;overflow-x:auto"></div>
     <div class="conf-row" style="justify-content:center;margin-top:14px">
       <div>
@@ -677,14 +688,40 @@ function favPayloadFromResult(result){
     conf:result.layer5?.confidence??null,
   };
 }
+/* お気に入りバー (2026-07-27 改修)
+   銘柄が増えると縦に伸びて他の情報を押し下げるため、
+   ①折りたたみ可能にし、②既定では先頭12件だけ出す。
+   折りたたみ状態はlocalStorageに保存する。 */
+const FAV_FOLD_KEY='sp500_fav_folded_v1';
+const FAV_HEAD=12;
+let _favExpandAll=false;
+function _favFolded(){ try{return localStorage.getItem(FAV_FOLD_KEY)==='1';}catch(e){return false;} }
+function _setFavFolded(v){ try{localStorage.setItem(FAV_FOLD_KEY,v?'1':'0');}catch(e){} }
+
 async function renderFavorites(){
   const arr=await Favorites.list(), box=document.getElementById('favChips'),
-        bar=document.getElementById('favBar');
+        bar=document.getElementById('favBar'), wrap=document.getElementById('favChipsWrap'),
+        more=document.getElementById('favMore'), arrow=document.getElementById('favArrow'),
+        cnt=document.getElementById('favCount'), hint=document.getElementById('favHint');
   if(!arr.length){bar.style.display='none';return;}
   bar.style.display='';
-  box.innerHTML=arr.map(f=>
+  const folded=_favFolded();
+  if(cnt) cnt.textContent=`(${arr.length})`;
+  if(arrow) arrow.textContent=folded?'▸':'▾';
+  if(hint) hint.textContent=folded?'タップで開く':'タップで折りたたむ';
+  if(wrap) wrap.style.display=folded?'none':'';
+  const show=_favExpandAll?arr:arr.slice(0,FAV_HEAD);
+  box.innerHTML=show.map(f=>
     `<button class="chip" data-fc="${f.c}" data-fs="${f.s}">${f.c} <span style="opacity:.5;font-size:10px">${f.s==='yahoo'?'Y':'AV'}</span></button>`
   ).join('');
+  if(more){
+    more.innerHTML=(arr.length>FAV_HEAD)
+      ? `<button id="favMoreBtn" style="background:none;border:0;padding:2px 0;cursor:pointer;
+          color:var(--t3);font-size:10.5px;font-family:inherit">${_favExpandAll
+            ?'▲ 先頭'+FAV_HEAD+'件だけ表示':'▼ 残り'+(arr.length-FAV_HEAD)+'件を表示'}</button>` : '';
+    const mb=document.getElementById('favMoreBtn');
+    if(mb) mb.addEventListener('click',()=>{_favExpandAll=!_favExpandAll;renderFavorites();});
+  }
   box.querySelectorAll('.chip').forEach(btn=>{
     btn.addEventListener('click',()=>{
       src=btn.dataset.fs;
@@ -694,6 +731,9 @@ async function renderFavorites(){
     });
   });
 }
+document.getElementById('favToggle')?.addEventListener('click',()=>{
+  _setFavFolded(!_favFolded()); renderFavorites();
+});
 async function updateFavBtn(){
   const sym=getCurSym(),c=src==='yahoo'?sym.y:(sym.a||sym.y);
   const b=document.getElementById('btnFav');
@@ -1027,6 +1067,55 @@ const CONFIG={
            execute:{ share:51.5, win:56.4, mae:-4.30, r10:17.3 } },
   },
 
+  /* ══════════════════════════════════════════════════════════
+     WISDOM: 相場格言と天井形成の検証結果 (2026-07-27 追加)
+     出典: 「相場格言の検証と天井形成の分析 v2.0」「半値八掛け二割引の検証 v1.0」
+           「一目均衡表の法則性 (本CONFIG内に併記)」
+     いずれも日米73銘柄・1990-2026年の実測。
+
+     採用しなかった格言もここに残してある。理由を明示しておかないと、
+     後から「なぜ実装していないのか」が分からなくなるため。
+     ══════════════════════════════════════════════════════════ */
+  wisdom:{
+    enabled:true,
+    // ── 半値戻しは全値戻し (成立) ──
+    modori:{ base:49.2, r33:57.2, r50:67.9, r67:79.1, minDecline:15, maxDecline:60,
+      note:'半値まで戻すと全値戻しの確率は67.9%（無条件49.2%の1.38倍）。'
+          +'ただし60%超の暴落からでは37.5%にとどまり成立しない' },
+    // ── 半値八掛け二割引 (成立。むしろ格言より深い) ──
+    hanne:{ levels:[-50,-60,-68], medianBottom:-73.6, medianJP:-79.0, medianUS:-67.6,
+      stopAtHalf:17.0, toHachigake:72.7, toNiwaribiki:57.6,
+      worstBuyZone:[-60,-50],
+      note:'高値から-50%を割った165件のうち、半値付近で止まったのは17%だけ。'
+          +'最安値の中央値は-73.6%。買い場として最悪なのは-50〜-60%の帯' },
+    // ── 天井形成 (角度は成立・出来高は不成立) ──
+    top:{ angleTop:131, angleNonTop:70, accelShare:86.7,
+      accelBands:[{th:300,after60:-21.25,label:'急加速'},{th:100,after60:-13.36,label:'加速'},
+                  {th:0,after60:-10.77,label:'やや加速'},{th:-9999,after60:-11.29,label:'減速'}],
+      rangeNarrow:-7.39, rangeWide:-21.59,
+      note:'天井直前20日の上昇角度は年率131%（天井でない上昇は70%）。'
+          +'出来高に判別力はないが、天井前後の値幅は下げの深さと強く関係する' },
+    // ── 一目均衡表 (逆神。位置判定には有効) ──
+    ichimoku:{
+      twistLift:{top:0.79,bottom:0.80},
+      states:{ above:{win20:53.9,topRate:2.60,botRate:0.09},
+               inside:{win20:53.4,topRate:0.87,botRate:1.13},
+               below:{win20:55.3,topRate:0.10,botRate:3.24},
+               sanyaku:{win20:53.8,topRate:3.14,botRate:0.00},
+               sangyaku:{win20:55.7,topRate:0.01,botRate:4.04} },
+      baseTop:1.44, baseBot:1.39, baseWin20:54.4,
+      note:'雲のねじれは天底を当てない（リフト0.79-0.80倍と基準以下）。'
+          +'三役好転は天井圏の指標（天井率2.2倍）、三役逆転は底圏の指標（底率2.9倍）として使う' },
+    // ── 採用しなかったもの ──
+    rejected:[
+      {name:'半値押し', reason:'押し幅の中央値は68.1%で、1/3・1/2・2/3に集中しない。35.8%は全戻し'},
+      {name:'大保ち合いは大相場', reason:'保ち合いの長さと放れ後の値幅の相関は-0.241。長いほど値動きは小さい'},
+      {name:'保ち合い放れにつけ', reason:'上放れ追随は60日+1.76%と弱く、下放れ追随（売り）は逆に不利'},
+      {name:'閑散に売り無し', reason:'閑散なほど成績が悪く下落リスクも高い（極めて閑散で20日勝率50.0%）'},
+      {name:'雲のねじれで天底', reason:'ねじれの±10日に天底が来る確率は基準の0.79-0.80倍と、むしろ低い'},
+    ],
+  },
+
   // Layer5: Confidence計算パラメータ
   confidence:{
     agreementWeight:   0.45,  // レイヤー間一致度の寄与率
@@ -1217,11 +1306,12 @@ async function scanOneFav(code,srcVal){
     const sym=resolveSym(code);
     const market=detectMarket(code);
     const raw=await fetchBySource(srcVal||'yahoo',sym);
-    const sentiment=await fetchSentiment(market).catch(()=>({market}));
+    let sentiment=await fetchSentiment(market).catch(()=>({market}));
+    if(!sentiment.pcr){ await ensureFundJson(); injectFundIndicators(sentiment); }
     const fa=FundPersist.getAuto()||_fundAuto;
     const sm=FundPersist.getManual(); if(sm) applyManualToDOM(sm);
     saveFundManual();
-    const data=clean(raw);
+    const data=clean(PROV.apply(raw,code,market));
     const result=analyse(data,sentiment,market,fa);
     const p=favPayloadFromResult(result);
     if(p&&p.score!=null) p.score=Math.round(p.score*10)/10;
@@ -1274,7 +1364,7 @@ function recomputeFromCache(){
   if(!dataCache.has(key)) return;
   const c=dataCache.get(key);
   try{
-    const data=clean(c.raw);
+    const data=clean(PROV.apply(c.raw,c.raw?.meta?.symbol,c.market));
     const result=analyse(data,c.sentiment,c.market,c.fundAuto);
     c.result=result; _lastResult=result;
     renderResult(result);
@@ -2835,6 +2925,44 @@ function zLast(closes,win=252){
 }
 let _fundAuto=null,_fundAutoAt=0,_fundJson=null,_fundJsonAt=0;
 
+/* 2026-07-27 修正: Put/Call Ratio がアプリに反映されない不具合
+   原因: _fundJson は fetchFundamentalAuto() の中でしか設定されないが、
+         run() は「ファンダのキャッシュが古いときだけ」その関数を呼ぶ設計だった。
+         そのためページを開き直した直後などキャッシュが新しい場合は
+         _fundJson が null のままで、PCRの注入処理が空振りしていた。
+         バッチ側は MacroMicro 経由で取得できているのに画面に出ない、という状態。
+   対策: 必要になった時点で読み込む関数を用意し、localStorage にも退避する。 */
+const FUNDJSON_KEY='sp500_fundjson_cache_v1';
+async function ensureFundJson(){
+  if(_fundJson&&Date.now()-_fundJsonAt<30*60*1000) return _fundJson;
+  if(!_fundJson){
+    try{
+      const raw=localStorage.getItem(FUNDJSON_KEY);
+      if(raw){
+        const o=JSON.parse(raw);
+        if(o&&o.j&&o.at&&Date.now()-o.at<24*3600*1000){ _fundJson=o.j; _fundJsonAt=o.at; }
+      }
+    }catch(e){}
+  }
+  if(_fundJson&&Date.now()-_fundJsonAt<30*60*1000) return _fundJson;
+  const j=await fetchFundJsonFromGitHub();
+  if(j){
+    _fundJson=j; _fundJsonAt=Date.now();
+    try{ localStorage.setItem(FUNDJSON_KEY,JSON.stringify({j,at:_fundJsonAt})); }catch(e){}
+  }
+  return _fundJson;
+}
+/* fundamentals.json の指標を sentiment へ注入する。
+   PCR以外の指標を足すときもここに集約する。 */
+function injectFundIndicators(sentiment){
+  const ind=_fundJson&&_fundJson.indicators; if(!ind||!sentiment) return sentiment;
+  if(!sentiment.pcr&&ind.pcr){
+    const v=(ind.pcr.value!==undefined&&ind.pcr.value!==null)?ind.pcr.value:ind.pcr.ratio;
+    if(Number.isFinite(v)) sentiment.pcr={ratio:v,source:'fundamentals.json',stale:!!ind.pcr.stale};
+  }
+  return sentiment;
+}
+
 /* GitHub上のfundamentals.jsonを取得 → 手入力欄を自動入力 + Yahoo系データを返す */
 async function fetchFundJsonFromGitHub(){
   /* 2026-07-26 修正:
@@ -2886,7 +3014,10 @@ async function fetchFundamentalAuto(force){
   let gj=null;
   if(!force || !_fundJson || Date.now()-_fundJsonAt>10*60*1000){
     gj=await fetchFundJsonFromGitHub();
-    if(gj){_fundJson=gj; _fundJsonAt=Date.now();}
+    if(gj){
+      _fundJson=gj; _fundJsonAt=Date.now();
+      try{ localStorage.setItem(FUNDJSON_KEY,JSON.stringify({j:gj,at:_fundJsonAt})); }catch(e){}
+    }
     else gj=_fundJson;
   }else gj=_fundJson;
 
@@ -3630,6 +3761,200 @@ function renderCandlestickChart(seriesData,days=66){
 
 function clamp100(v){return Math.max(0,Math.min(100,Number.isFinite(v)?v:0));}
 
+
+
+/* ═══════════════════════════════════════════════
+   PROVISIONAL — ザラ場中の仮値 (2026-07-27 追加)
+
+   Yahoo Financeの日足は、ザラ場中だと当日のバーが未確定(または欠落)する。
+   そのため「今の株価でスコアがどうなるか」を確かめられなかった。
+   ここでは当日の終値を手入力の仮値で差し替えて再計算できるようにする。
+   仮値はメモリ上だけで保持し、保存もキャッシュもしない。
+═══════════════════════════════════════════════ */
+const PROV={
+  value:null, symbol:null,
+  set(sym,v){ this.symbol=sym; this.value=Number.isFinite(v)?v:null; },
+  clear(){ this.value=null; this.symbol=null; },
+  /* 系列の最終バーを仮値で差し替える。当日バーが無ければ1本足す。 */
+  apply(raw,sym,market){
+    if(this.value==null||this.symbol!==sym||!raw?.closes?.length) return raw;
+    const d={...raw,
+      opens:raw.opens.slice(),closes:raw.closes.slice(),
+      highs:raw.highs.slice(),lows:raw.lows.slice(),
+      volumes:raw.volumes.slice(),dates:(raw.dates||[]).slice()};
+    const n=d.closes.length, v=this.value;
+    let last=d.dates[n-1];
+    let today=null;
+    try{ today=expectedLastSessionDate(market); }catch(e){}
+    if(today&&last&&last<today){
+      // 当日のバーがまだ無い → 1本追加する
+      d.dates.push(today); d.opens.push(d.closes[n-1]);
+      d.closes.push(v); d.highs.push(Math.max(v,d.closes[n-1]));
+      d.lows.push(Math.min(v,d.closes[n-1])); d.volumes.push(d.volumes[n-1]||0);
+    }else{
+      // 当日のバーがある → 終値だけ差し替える
+      d.closes[n-1]=v;
+      d.highs[n-1]=Math.max(d.highs[n-1],v);
+      d.lows[n-1]=Math.min(d.lows[n-1],v);
+    }
+    const m=d.closes.length;
+    d.meta={...(d.meta||{}),price:v,prev:d.closes[m-2],provisional:true};
+    d.provisionalLast=true;
+    return d;
+  },
+};
+
+function renderProvPanel(result){
+  const el=document.getElementById('provPanel');
+  if(!el) return;
+  const sym=result?.info?.symbol||'';
+  const cur=result?.info?.cur;
+  const on=PROV.value!=null&&PROV.symbol===sym;
+  const lastDate=result?.series?.dates?.[result.series.dates.length-1]||'';
+  let stale='';
+  try{
+    const exp=expectedLastSessionDate(result?.info?.market||'US');
+    if(lastDate&&exp&&lastDate<exp)
+      stale=`<span style="color:#BA7517">最新の終値は ${lastDate} です（${exp} 分はまだ確定していません）</span>`;
+    else if(lastDate)
+      stale=`<span style="color:var(--t3)">最新の終値: ${lastDate}</span>`;
+  }catch(e){}
+  el.innerHTML=`<div style="border:.5px solid var(--bd);border-radius:var(--r);padding:8px 10px;background:var(--bg)">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span style="font-size:11px;color:var(--t2)">ザラ場の仮値</span>
+      <input id="iProv" type="number" step="any" inputmode="decimal"
+        placeholder="${cur!=null?cur:'現在値'}" value="${on?PROV.value:''}"
+        style="width:110px;padding:4px 7px;font-size:12px;font-family:var(--mono);
+        border:.5px solid var(--bd2);border-radius:5px;background:var(--bg2);color:var(--t1)">
+      <button id="btnProv" style="padding:4px 11px;font-size:11px;border-radius:5px;cursor:pointer;
+        border:.5px solid ${on?'#BA7517':'var(--bd2)'};background:${on?'rgba(186,117,23,.15)':'var(--bg3)'};
+        color:${on?'#BA7517':'var(--t2)'};font-family:inherit">${on?'仮値を解除':'この値で再計算'}</button>
+      ${on?'<span style="font-size:10.5px;color:#BA7517">仮値で計算中</span>':''}
+      <span style="flex:1"></span>
+      <span style="font-size:10px">${stale}</span>
+    </div>
+    <p style="font-size:10px;color:var(--t3);line-height:1.5;margin:5px 0 0">
+      日足の提供元がザラ場中の値を返さないため、当日の値は確定後まで反映されません。
+      現在値を入力すると、その株価を当日の終値とみなして全スコアを再計算します。
+      入力値は保存されず、銘柄を変えると解除されます。</p>
+  </div>`;
+  document.getElementById('btnProv')?.addEventListener('click',()=>{
+    if(on){ PROV.clear(); }
+    else{
+      const v=parseFloat(document.getElementById('iProv').value);
+      if(!Number.isFinite(v)||v<=0){ alert('仮の株価を入力してください'); return; }
+      PROV.set(sym,v);
+    }
+    run(false);
+  });
+  document.getElementById('iProv')?.addEventListener('keydown',e=>{
+    if(e.key==='Enter') document.getElementById('btnProv')?.click();
+  });
+}
+
+
+/* ═══════════════════════════════════════════════
+   WISDOM — 相場格言・天井形成・一目均衡表の実測を当てはめる (2026-07-27)
+   スコアには加算せず、現在地の説明として表示する。
+═══════════════════════════════════════════════ */
+const WISDOM={
+  compute(result){
+    const cfg=CONFIG.wisdom;
+    if(!cfg||!cfg.enabled) return null;
+    const S=result.series||{}, C=S.closes||[], H=S.highs||[], L=S.lows||[];
+    const n=C.length;
+    if(n<120) return null;
+    const cur=C[n-1], out={items:[]};
+
+    // ── ① 高値からの位置 (半値八掛け二割引) ──
+    const peak=Math.max(...C);
+    const dd=(cur/peak-1)*100;
+    out.drawdown=dd;
+    if(dd<=-40){
+      const h=cfg.hanne;
+      // worstBuyZone は [下限,上限] = [-60,-50] の順。-55% はこの帯に入る
+      const zone=(dd<=h.worstBuyZone[1]&&dd>=h.worstBuyZone[0]);
+      out.items.push({
+        key:'hanne', tone: zone?'bad':(dd<=-68?'good':'mid'),
+        title:`高値から ${dd.toFixed(1)}%`,
+        body: dd<=-68
+          ? `二割引（-68%）を超えて下げています。実測ではこの水準から先の1年後リターンは`
+            +`中央値+9.5%（-75%なら+16.3%）と、-50〜-60%の帯より良好でした。`
+          : zone
+          ? `<b>実測で最も報われなかった帯</b>です。-50%を割った165件のうち半値付近で止まったのは`
+            +`${h.stopAtHalf}%だけで、${h.toHachigake}%が八掛け(-60%)、${h.toNiwaribiki}%が二割引(-68%)まで下げました。`
+            +`最安値の中央値は${h.medianBottom}%（日本株は${h.medianJP}%）です。`
+          : `半値（-50%）にはまだ達していません。`,
+      });
+    }
+    // ── ② 半値戻し ──
+    // 直近120日の安値と、その前の高値から戻り率を測る
+    const w=Math.min(250,n);
+    const seg=C.slice(-w), segL=L.slice(-w), segH=H.slice(-w);
+    let li=0; for(let i=0;i<seg.length;i++) if(seg[i]<seg[li]) li=i;
+    let hiBefore=Math.max(...segH.slice(0,li+1));
+    const lowV=seg[li];
+    if(li<seg.length-5 && hiBefore>lowV*1.15){
+      const r=(cur-lowV)/(hiBefore-lowV)*100;
+      const m=cfg.modori;
+      const declined=(1-lowV/hiBefore)*100;
+      if(r>=20&&r<100){
+        const lvl=r>=66.7?m.r67:r>=50?m.r50:r>=33.3?m.r33:null;
+        const lab=r>=66.7?'2/3戻し':r>=50?'半値戻し':r>=33.3?'1/3戻し':null;
+        if(lvl){
+          const ok=declined<=m.maxDecline;
+          out.items.push({key:'modori',tone:ok?'good':'mid',
+            title:`直近の下落（-${declined.toFixed(0)}%）に対し ${r.toFixed(0)}% 戻した（${lab}）`,
+            body: ok
+              ? `実測では${lab}を達成した後、全値戻しに至ったのは<b>${lvl}%</b>でした（無条件${m.base}%）。`
+                +`戻すほど確率は上がります。`
+              : `ただし元の下落が${declined.toFixed(0)}%と大きく、`
+                +`60%超の暴落からの戻りでは半値戻ししても全値戻しは37.5%にとどまります。`});
+        }
+      }
+    }
+    // ── ③ 上昇角度（天井の警告） ──
+    if(n>=90){
+      const ang=(x,a,b)=>((C[x]/C[x-a]-1)*100)/a*250;
+      const a20=ang(n-1,20), a60=((C[n-21]/C[n-81]-1)*100)/60*250;
+      const accel=a20-a60;
+      out.angle={a20,a60,accel};
+      if(a20>0&&accel>0){
+        const t=cfg.top;
+        const band=t.accelBands.find(b=>accel>=b.th)||t.accelBands[t.accelBands.length-1];
+        // 天井前後の値幅
+        const rng=(Math.max(...H.slice(-30))-Math.min(...L.slice(-30)))/cur*100;
+        out.items.push({key:'angle',tone:accel>=300?'bad':accel>=100?'mid':'off',
+          title:`直近20日の上昇角度 年率${a20.toFixed(0)}%（その前は${a60.toFixed(0)}%）`,
+          body:`天井をつけた局面の直前20日は年率${t.angleTop}%、天井にならなかった上昇は${t.angleNonTop}%でした。`
+            +`加速の度合いは「${band.label}」に相当し、この帯で天井をつけた場合の`
+            +`その後60日の中央値は<b>${band.after60}%</b>です。`
+            +`直近30日の値幅は${rng.toFixed(0)}%で、`
+            +`値幅の広い天井は-21.6%、狭い天井は-7.4%と下げの深さが3倍違います。`});
+      }
+    }
+    // ── ④ 一目均衡表の位置 ──
+    try{
+      const cloud=calcIchimokuCloud(H,L,C);
+      if(cloud&&cloud.pos){
+        // calcIchimokuCloud の戻り値は {pos:'above'|'below'|'in'}
+        const I=cfg.ichimoku, key=cloud.pos==='above'?'above':cloud.pos==='below'?'below':'inside';
+        const st=I.states[key];
+        if(st){
+          const lab={above:'雲の上',inside:'雲の中',below:'雲の下'}[key];
+          out.items.push({key:'ichimoku',tone:key==='below'?'good':key==='above'?'mid':'off',
+            title:`一目均衡表: ${lab}`,
+            body:`実測では雲の上は20日勝率${I.states.above.win20}%・天井率${I.states.above.topRate}%、`
+              +`雲の下は${I.states.below.win20}%・底率${I.states.below.botRate}%でした（基準は勝率${I.baseWin20}%・`
+              +`天井率${I.baseTop}%・底率${I.baseBot}%）。`
+              +`<b>雲の位置は方向の予測ではなく、天井圏か底圏かの位置判定に使うのが妥当です。</b>`
+              +`なお雲のねじれは天底の的中に寄与しませんでした（リフト${I.twistLift.top}倍）。`});
+        }
+      }
+    }catch(e){}
+    return out.items.length?out:null;
+  },
+};
 
 /* ═══════════════════════════════════════════════
    PULLBACK — 上昇トレンド中の押し目スコア (2026-07-26 追加)
@@ -4409,6 +4734,28 @@ function renderResult(result){
     </div>`;
   })();
 
+  renderProvPanel(result);
+  /* ══ 相場格言・天井・一目の当てはめ (2026-07-27) ══ */
+  (function renderWisdom(){
+    const el=document.getElementById('wisdomPanel'); if(!el) return;
+    let w=null; try{ w=WISDOM.compute(result); }catch(e){}
+    if(!w){ el.innerHTML=''; return; }
+    const C={good:'#1D9E75',mid:'#BA7517',bad:'#D85A30',off:'#7878a0'};
+    el.innerHTML=`<div class="pb-card">
+      <div style="font-size:12.5px;color:var(--t1);font-weight:600;margin-bottom:6px">
+        相場格言との照合（実測ベース）</div>
+      ${w.items.map(it=>`<div style="border-left:3px solid ${C[it.tone]||C.off};padding:5px 9px;
+        margin-bottom:6px;background:${(C[it.tone]||C.off)}0f;border-radius:5px">
+        <div style="font-size:11.5px;color:var(--t1);font-weight:600">${it.title}</div>
+        <div style="font-size:10.5px;color:var(--t2);line-height:1.55;margin-top:2px">${it.body}</div>
+      </div>`).join('')}
+      <details style="margin-top:4px"><summary style="cursor:pointer;font-size:10.5px;color:var(--t3);list-style:none">
+        ▸ 検証して<b>採用しなかった</b>格言（${CONFIG.wisdom.rejected.length}件）</summary>
+        ${CONFIG.wisdom.rejected.map(r=>`<div class="pb-row"><span>${r.name}</span></div>
+          <div style="font-size:10px;color:var(--t3);line-height:1.5;margin:-2px 0 5px">${r.reason}</div>`).join('')}
+      </details>
+    </div>`;
+  })();
   /* ══ 押し目スコア (2026-07-26 追加) ══ */
   (function renderPullback(){
     const el=document.getElementById('pullbackPanel');
@@ -4708,6 +5055,9 @@ function scheduleHistory(key,data,sentiment,days){
 async function run(force){
   // 需給データは初回のみ読み込む(失敗しても他の処理は続行する)
   if(!SUPPLY.loaded) await SUPPLY.load();
+  // 銘柄が変わったら仮値は解除する(別銘柄の値を持ち越さない)
+  {const _s=getCurSym(); const _c=src==='yahoo'?_s.y:(_s.a||_s.y);
+   if(PROV.value!=null&&PROV.symbol!==_c) PROV.clear();}
   ['dResult','dErr'].forEach(id=>document.getElementById(id).style.display='none');
   const sym=getCurSym(), key=cacheKeyFor(src,sym);
   const manualCode=document.getElementById('iSym').value.trim().toUpperCase();
@@ -4755,10 +5105,8 @@ async function run(force){
         const sm=FundPersist.getManual(); if(sm) applyManualToDOM(sm);
         saveFundManual();
         const sentiment=await fetchSentiment(market).catch(()=>({market}));
-        if(!sentiment.pcr && _fundJson?.indicators?.pcr){
-          sentiment.pcr={ratio: _fundJson.indicators.pcr.value};
-        }
-        const data=clean(raw);
+        if(!sentiment.pcr){ await ensureFundJson(); injectFundIndicators(sentiment); }
+        const data=clean(PROV.apply(raw,sym.y||sym.a,market));
         const result=analyse(data,sentiment,market,fa);
         const historical=[];
         dataCache.set(key,{raw,sentiment,market,fundAuto:fa,result,historical,fetchedAt:pc.at});
@@ -4794,10 +5142,8 @@ async function run(force){
         const sm=FundPersist.getManual(); if(sm) applyManualToDOM(sm);
         saveFundManual();
         const sentiment=await fetchSentiment(market).catch(()=>({market}));
-        if(!sentiment.pcr && _fundJson?.indicators?.pcr){
-          sentiment.pcr={ratio:_fundJson.indicators.pcr.value};
-        }
-        const data=clean(merged);
+        if(!sentiment.pcr){ await ensureFundJson(); injectFundIndicators(sentiment); }
+        const data=clean(PROV.apply(merged,sym.y||sym.a,market));
         const result=analyse(data,sentiment,market,fa);
         const d3=sym.y;
         document.getElementById('mainTitle').textContent=
@@ -4835,10 +5181,7 @@ async function run(force){
     if(rs[0].status==='rejected') throw rs[0].reason;
     const raw=rs[0].value;
     const sentiment=rs[1].status==='fulfilled'?rs[1].value:{market};
-    // PCRパッチ: sentimentにPCRがなければJSONから注入
-    if(!sentiment.pcr && _fundJson?.indicators?.pcr){
-      sentiment.pcr={ratio: _fundJson.indicators.pcr.value};
-    }
+    if(!sentiment.pcr){ await ensureFundJson(); injectFundIndicators(sentiment); }
     let fa;
     if(needFund&&rs[2]?.status==='fulfilled'){
       fa=rs[2].value; saveFundManual(); FundPersist.save(fa,getFundManual());
@@ -4853,7 +5196,7 @@ async function run(force){
     const d2=src==='yahoo'?sym.y:(sym.a||sym.y);
     document.getElementById('mainTitle').textContent=
       (sym.name&&sym.name!==d2?sym.name+' ':'')+d2+' テクニカルスコア';
-    const data=clean(raw);
+    const data=clean(PROV.apply(raw,sym.y||sym.a,market));
     const result=analyse(data,sentiment,market,fa);
     dataCache.set(key,{raw,sentiment,market,fundAuto:fa,result,historical:[],fetchedAt:Date.now()});
     _lastResult=result;
