@@ -81,36 +81,71 @@ def _yahoo_z(symbol):
 
 
 def _fetch_pcr():
-    """Put/Call Ratio: CBOE Daily Market Statisticsページから最新PCRをスクレイピング"""
-    # 方法1: CBOE Market Statisticsページ
+    r"""Put/Call Ratio を取得する。
+
+    2026-07-27 修正 — 系列の不一致と誤取得を直した
+    ─────────────────────────────────────────────
+    CBOEのPut/Call Ratioには3系列あり、水準がまったく違う。
+
+        エクイティ (Equity)  : 平均 約0.62   個別株オプションのみ
+        トータル   (Total)   : 平均 約0.95   全オプション
+        インデックス(Index)  : 平均 約1.10   指数オプションのみ
+
+    バックテストで使用したのは TradingView の USI:PCC = **トータル**で、
+    実測の平均は0.945だった。スコアの閾値(静けさの天井 PCR≦0.8 など)も
+    この系列で較正してある。
+
+    ところが従来の実装はCBOEページから "EQUITY PUT/CALL RATIO" を、
+    MacroMicroからは series/1640 (=エクイティ) を取りにいっていた。
+    水準が0.3ほど低い系列を、トータル用の閾値で判定していたことになり、
+    常に「強気(complacent)寄り」に判定される状態だった。
+
+    さらにMacroMicro側の正規表現が
+        (?:Latest|latest|最新)[^0-9]*?(0\.\d{2,3})
+    と非常に緩く、ページ内の無関係な数値を拾う危険があった。
+
+    本修正では **トータル** を第一候補とし、取得した系列名も併せて記録する。
+    エクイティしか取れなかった場合は series を 'equity' として保存し、
+    アプリ側で判別できるようにする(換算はしない。系列が違えば分布も違うため)。
+    """
+    import re
+
+    def _ok(v):
+        return 0.2 < v < 3.5
+
+    # ── 方法1: CBOE Daily Market Statistics (トータルを優先) ──
     try:
         html = _get("https://www.cboe.com/us/options/market_statistics/daily/",
                     {"Referer": "https://www.cboe.com/"})
-        # "EQUITY PUT/CALL RATIO" の近くの数値を探す
-        import re
-        m = re.search(r'(?:EQUITY|Equity)[^0-9]*?(?:PUT.?CALL|Put.?Call)[^0-9]*?(0\.\d{2,3})', html, re.I)
-        if m:
-            val = float(m.group(1))
-            if 0.2 < val < 3:
-                return {"value": round(val, 3), "source": "CBOE Daily Stats"}
+        # 「TOTAL PUT/CALL RATIO 0.86」のような並びを厳密に拾う
+        for pat, series in (
+            (r'TOTAL\s*PUT[/\s]*CALL\s*RATIO\D{0,40}?(\d\.\d{2,3})', 'total'),
+            (r'EQUITY\s*PUT[/\s]*CALL\s*RATIO\D{0,40}?(\d\.\d{2,3})', 'equity'),
+        ):
+            m = re.search(pat, html, re.I)
+            if m:
+                v = float(m.group(1))
+                if _ok(v):
+                    return {"value": round(v, 3), "series": series,
+                            "source": f"CBOE Daily Stats ({series})"}
     except Exception as e:
-        print(f"  ✖ PCR (CBOE daily): {e}")
-    # 方法2: MacroMicro (最新値が検索で確認済み: 2026-06-30 = 0.64)
-    try:
-        html = _get("https://en.macromicro.me/series/1640/us-put-call-ratio")
-        import re
-        # ページ内の最新値を探す
-        m = re.search(r'"latest_value"[^0-9]*?(0\.\d{2,3})', html)
-        if not m:
-            m = re.search(r'(?:Latest|latest|最新)[^0-9]*?(0\.\d{2,3})', html)
-        if m:
-            val = float(m.group(1))
-            if 0.2 < val < 3:
-                return {"value": round(val, 3), "source": "MacroMicro CBOE PCR"}
-    except Exception as e:
-        print(f"  ✖ PCR (MacroMicro): {e}")
-    # 方法3: 旧CSVフォールバック(2019年で停止しているため最終手段)
-    # → 古すぎるため使用しない
+        print(f"  x PCR (CBOE daily): {e}")
+
+    # ── 方法2: MacroMicro (1651=トータル / 1640=エクイティ) ──
+    #   ページ構造が変わりやすいため、日付とセットで並んでいる数値だけを拾う。
+    for sid, series in (("1651", "total"), ("1640", "equity")):
+        try:
+            html = _get(f"https://en.macromicro.me/series/{sid}/us-put-call-ratio")
+            # 「2026-07-14 · 0.62」のように日付の直後に来る値を優先する
+            m = re.search(r'(20\d{2}-\d{2}-\d{2})\D{1,40}?(\d\.\d{2,3})', html)
+            if m:
+                v = float(m.group(2))
+                if _ok(v):
+                    return {"value": round(v, 3), "series": series, "as_of": m.group(1),
+                            "source": f"MacroMicro {sid} ({series})"}
+        except Exception as e:
+            print(f"  x PCR (MacroMicro {sid}): {e}")
+
     return None
 
 def run_fetch():

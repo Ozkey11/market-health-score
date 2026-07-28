@@ -2958,7 +2958,8 @@ function injectFundIndicators(sentiment){
   const ind=_fundJson&&_fundJson.indicators; if(!ind||!sentiment) return sentiment;
   if(!sentiment.pcr&&ind.pcr){
     const v=(ind.pcr.value!==undefined&&ind.pcr.value!==null)?ind.pcr.value:ind.pcr.ratio;
-    if(Number.isFinite(v)) sentiment.pcr={ratio:v,source:'fundamentals.json',stale:!!ind.pcr.stale};
+    if(Number.isFinite(v)) sentiment.pcr={ratio:v,source:'fundamentals.json',
+      stale:!!ind.pcr.stale, series:ind.pcr.series||null, asOf:ind.pcr.as_of||null};
   }
   return sentiment;
 }
@@ -3109,14 +3110,25 @@ function computeFundamental(auto,manual){
   const cz=auto.copper?auto.copper.z:null;
   const wz=auto.wti?auto.wti.z:null;
   const dz=auto.dxy?auto.dxy.z:null;
+  /* 2026-07-27 追加: 偏差値(σ)だけでは実際の値が分からないため生値を併記する。
+     スコアの計算は従来どおり1年偏差値(z)で行う。生値は表示のみ。
+     単位: 銅=ドル/ポンド, 原油=ドル/バレル, ドル指数=指数値 */
+  const cv=auto.copper?auto.copper.last:null;
+  const wv=auto.wti?auto.wti.last:null;
+  const dv=auto.dxy?auto.dxy.last:null;
+  const zdisp=(z,raw,unit,dec)=>{
+    if(z==null) return '取得不可';
+    const zs=(z>=0?'+':'')+z.toFixed(2)+'σ';
+    return raw==null?zs:`${zs} <span style="color:var(--t3)">(${raw.toFixed(dec)}${unit})</span>`;
+  };
 
   // 大底側の証拠（0〜1）— クレジット/パニック系のみ（第1レポート4章・第2レポート3章）
   const B=[
     {k:'hy',     name:'ハイイールド債スプレッド',        w:Wb.hy,     v:hy, s:hy==null?null:rampF(hy,5,10),        d:hy==null?'—':hy.toFixed(2)+'%',  src:{t:'FRED BAMLH0A0HYM2',u:'https://fred.stlouisfed.org/series/BAMLH0A0HYM2'}, i:'社債の信用不安度。5%超で警戒、10%超はリーマン級'},
     {k:'move',   name:'MOVE指数(債券ボラ)',            w:Wb.move,   v:mv, s:mv==null?null:rampF(mv,120,170),      d:mv==null?'取得不可':mv.toFixed(1), src:{t:'Yahoo ^MOVE (自動)',u:'https://finance.yahoo.com/quote/%5EMOVE/'}, i:'債券市場の恐怖指数。120超で不安、170超は全面パニック'},
-    {k:'copperZ',name:'銅先物(1年偏差値)',      w:Wb.copperZ,v:cz, s:cz==null?null:rampF(-cz,1,3),         d:cz==null?'取得不可':cz.toFixed(2)+'σ', src:{t:'Yahoo HG=F (自動)',u:'https://finance.yahoo.com/quote/HG%3DF/'}, i:'銅が1年平均より大幅下落=世界景気の悲観'},
-    {k:'wtiZ',   name:'原油WTI(1年偏差値)',     w:Wb.wtiZ,   v:wz, s:wz==null?null:rampF(-wz,1,3),         d:wz==null?'取得不可':wz.toFixed(2)+'σ', src:{t:'Yahoo CL=F (自動)',u:'https://finance.yahoo.com/quote/CL%3DF/'}, i:'原油が1年平均より大幅下落=需要減退'},
-    {k:'dxyZ',   name:'米ドル指数(1年偏差値)',    w:Wb.dxyZ,   v:dz, s:dz==null?null:rampF(dz,1,2.5),        d:dz==null?'取得不可':dz.toFixed(2)+'σ', src:{t:'Yahoo DX-Y.NYB (自動)',u:'https://finance.yahoo.com/quote/DX-Y.NYB/'}, i:'ドルが1年平均より大幅上昇=安全資産への逃避'},
+    {k:'copperZ',name:'銅先物(1年偏差値)',      w:Wb.copperZ,v:cz, s:cz==null?null:rampF(-cz,1,3),         d:zdisp(cz,cv,'ドル/lb',2), src:{t:'Yahoo HG=F (自動)',u:'https://finance.yahoo.com/quote/HG%3DF/'}, i:'銅が1年平均より大幅下落=世界景気の悲観'},
+    {k:'wtiZ',   name:'原油WTI(1年偏差値)',     w:Wb.wtiZ,   v:wz, s:wz==null?null:rampF(-wz,1,3),         d:zdisp(wz,wv,'ドル',1), src:{t:'Yahoo CL=F (自動)',u:'https://finance.yahoo.com/quote/CL%3DF/'}, i:'原油が1年平均より大幅下落=需要減退'},
+    {k:'dxyZ',   name:'米ドル指数(1年偏差値)',    w:Wb.dxyZ,   v:dz, s:dz==null?null:rampF(dz,1,2.5),        d:zdisp(dz,dv,'',2), src:{t:'Yahoo DX-Y.NYB (自動)',u:'https://finance.yahoo.com/quote/DX-Y.NYB/'}, i:'ドルが1年平均より大幅上昇=安全資産への逃避'},
     {k:'ismChg', name:'ISM製造業 底打ち反転',         w:Wb.ismChg, v:chg,s:(ism==null||chg==null)?null:(ism<50&&chg>0?rampF(chg,0,2):0), d:chg==null?'—':(ism<50&&chg>0?`${ism}へ+${chg.toFixed(1)}`:'条件外'), src:{t:'ISM PMI',u:'https://www.ismworld.org/supply-management-news-and-reports/reports/ism-report-on-business/'}, i:'製造業が不況圏(50未満)から回復=底打ちサイン'},
     {k:'perTtm', name:'S&P500 PER 割安',        w:Wb.perTtm, v:per,s:per==null?null:rampF(16-per,0,4),     d:per==null?'—':per.toFixed(1)+'倍', src:{t:'multpl.com',u:'https://www.multpl.com/s-p-500-pe-ratio'}, i:'株価収益率が割安水準(16倍以下)に低下'},
   ];
@@ -3128,7 +3140,7 @@ function computeFundamental(auto,manual){
     {k:'hyLow',  name:'HYスプレッド 楽観(低すぎ)',          w:Wt.hyLow,  v:hy, s:hy==null?null:rampF(3.5-hy,0,1.2),    d:hy==null?'—':hy.toFixed(2)+'%',  src:{t:'FRED BAMLH0A0HYM2',u:'https://fred.stlouisfed.org/series/BAMLH0A0HYM2'}, i:'スプレッドが低すぎ=市場がリスクを軽視'},
     {k:'moveLow',name:'MOVE指数 油断(低すぎ)',            w:Wt.moveLow,v:mv, s:mv==null?null:rampF(80-mv,0,25),      d:mv==null?'取得不可':mv.toFixed(1), src:{t:'Yahoo ^MOVE (自動)',u:'https://finance.yahoo.com/quote/%5EMOVE/'}, i:'債券ボラが低すぎ=リスクを忘れている状態'},
     {k:'ismChg', name:'ISM製造業 ピークアウト',   w:Wt.ismChg, v:chg,s:(ism==null||chg==null)?null:(ism>55&&chg<0?rampF(-chg,0,2):0), d:chg==null?'—':(ism>55&&chg<0?`${ism}へ${chg.toFixed(1)}`:'条件外'), src:{t:'ISM PMI',u:'https://www.ismworld.org/supply-management-news-and-reports/reports/ism-report-on-business/'}, i:'製造業が好況ピーク(55超)から低下=景気減速の兆し'},
-    {k:'copperZ',name:'銅先物 過熱(1年偏差値)',            w:Wt.copperZ,v:cz, s:cz==null?null:rampF(cz,1.5,3),        d:cz==null?'取得不可':cz.toFixed(2)+'σ', src:{t:'Yahoo HG=F (自動)',u:'https://finance.yahoo.com/quote/HG%3DF/'}, i:'銅が1年平均より大幅上昇=景気楽観の行き過ぎ'},
+    {k:'copperZ',name:'銅先物 過熱(1年偏差値)',            w:Wt.copperZ,v:cz, s:cz==null?null:rampF(cz,1.5,3),        d:zdisp(cz,cv,'ドル/lb',2), src:{t:'Yahoo HG=F (自動)',u:'https://finance.yahoo.com/quote/HG%3DF/'}, i:'銅が1年平均より大幅上昇=景気楽観の行き過ぎ'},
   ];
   function agg(items){
     const av=items.filter(it=>it.s!=null);
@@ -3184,7 +3196,7 @@ function computeLayer4(sentiment,hiloProxy,market){
   const hiloS=scoreHILO(hiloProxy), hiloOk=hiloProxy!=null;
   const items=[
     {name:'VIX'+(market==='JP'?'(^JNIV)':'(^VIX)'), maxW:8, s:vixS, ok:vixOk, disp:vixOk?sentiment.vix.price.toFixed(1):'取得不可', i:iVIX(sentiment.vix,market)},
-    {name:'Put/Call Ratio', maxW:6, s:pcrS, ok:pcrOk, disp:pcrOk?pcrVal.ratio.toFixed(2):
+    {name:'Put/Call Ratio(合計)', maxW:6, s:pcrS, ok:pcrOk, disp:pcrOk?(pcrVal.ratio.toFixed(2)+(pcrVal.series==='equity'?' <span style="color:#BA7517">※エクイティ系列</span>':'')+(pcrVal.asOf?' <span style="color:var(--t3)">'+pcrVal.asOf+'</span>':'')):
         (document.getElementById('fPCR')?.value?document.getElementById('fPCR').value+'(手入力)':'取得不可(米国のみ)'), i:iPCR(pcrVal)},
     {name:'Fear & Greed',   maxW:4, s:fgS,  ok:fgOk,  disp:fgOk?sentiment.fg.score.toFixed(0):'取得不可(米国のみ)', i:iFG(sentiment.fg)},
     {name:'新高値新安値比率(proxy)', maxW:4, s:hiloS, ok:hiloOk, disp:hiloOk?(hiloProxy*100).toFixed(0)+'%':'—', i:iHILO(hiloProxy)},
