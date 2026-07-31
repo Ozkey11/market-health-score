@@ -1,12 +1,12 @@
 {
- "version": "2026-07-30-0744",
+ "version": "2026-07-31-0823",
  "model_version": "mhs-core-1.0",
- "updated_at": "2026-07-30T07:44:42+00:00",
- "data_date": "2026-07-29",
+ "updated_at": "2026-07-31T08:23:39+00:00",
+ "data_date": "2026-07-30",
  "symbol": "^GSPC",
  "price_latest": {
-  "close": 7316.14990234375,
-  "change_pct": -1.52
+  "close": 7437.6298828125,
+  "change_pct": 1.66
  },
  "fundamental_latest": {
   "per_ttm": null,
@@ -14,20 +14,20 @@
   "per_is_manual": false
  },
  "macro_latest": {
-  "us10y": 4.61,
-  "us2y": 4.26,
-  "yield_curve_10y2y": 0.35,
-  "hy_spread": 2.84
+  "us10y": 4.67,
+  "us2y": 4.22,
+  "yield_curve_10y2y": 0.45,
+  "hy_spread": 2.87
  },
  "sentiment_latest": {
   "vix": {
-   "value": 19.760000228881836,
-   "date": "2026-07-30",
+   "value": 16.829999923706055,
+   "date": "2026-07-31",
    "is_manual": false
   },
   "nk_vi": {
-   "value": 39.790000915527344,
-   "date": "2026-07-30",
+   "value": 29.3799991607666,
+   "date": "2026-07-31",
    "is_manual": false
   },
   "put_call": null,
@@ -47,7 +47,7 @@
     "source_link": "https://en.macromicro.me/series/1651/us-put-call-ratio-index"
    },
    {
-    "item": "supply_us:2026-07-30",
+    "item": "supply_us:2026-07-31",
     "message": "HTTP 403",
     "source_link": "https://cdn.finra.org/equity/regsho/daily/"
    },
