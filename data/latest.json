@@ -1,7 +1,7 @@
 {
- "version": "2026-08-01-0739",
+ "version": "2026-08-04-0804",
  "model_version": "mhs-core-1.0",
- "updated_at": "2026-08-01T07:39:05+00:00",
+ "updated_at": "2026-08-04T08:04:52+00:00",
  "data_date": "2026-07-31",
  "symbol": "^GSPC",
  "price_latest": {
@@ -14,20 +14,20 @@
   "per_is_manual": false
  },
  "macro_latest": {
-  "us10y": 4.68,
-  "us2y": 4.23,
-  "yield_curve_10y2y": 0.45,
+  "us10y": 4.75,
+  "us2y": 4.28,
+  "yield_curve_10y2y": 0.47,
   "hy_spread": 2.84
  },
  "sentiment_latest": {
   "vix": {
-   "value": 15.989999771118164,
-   "date": "2026-07-31",
+   "value": 15.680000305175781,
+   "date": "2026-08-04",
    "is_manual": false
   },
   "nk_vi": {
-   "value": 29.3799991607666,
-   "date": "2026-07-31",
+   "value": 34.27000045776367,
+   "date": "2026-08-04",
    "is_manual": false
   },
   "put_call": null,
@@ -45,6 +45,11 @@
     "item": "sentiment:put_call",
     "message": "CBOE CSV取得失敗（形式変更の可能性。MacroMicroで確認し手動入力可）",
     "source_link": "https://en.macromicro.me/series/1651/us-put-call-ratio-index"
+   },
+   {
+    "item": "supply_us:2026-08-04",
+    "message": "HTTP 403",
+    "source_link": "https://cdn.finra.org/equity/regsho/daily/"
    },
    {
     "item": "aaii",
