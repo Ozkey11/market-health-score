@@ -1,12 +1,12 @@
 {
- "version": "2026-08-12-2318",
+ "version": "2026-08-13-2320",
  "model_version": "mhs-core-1.0",
- "updated_at": "2026-08-12T23:18:58+00:00",
- "data_date": "2026-08-12",
+ "updated_at": "2026-08-13T23:20:58+00:00",
+ "data_date": "2026-08-13",
  "symbol": "^GSPC",
  "price_latest": {
-  "close": 7748.5,
-  "change_pct": 0.26
+  "close": 7798.990234375,
+  "change_pct": 0.65
  },
  "fundamental_latest": {
   "per_ttm": null,
@@ -14,20 +14,20 @@
   "per_is_manual": false
  },
  "macro_latest": {
-  "us10y": 4.7,
-  "us2y": 4.22,
+  "us10y": 4.68,
+  "us2y": 4.2,
   "yield_curve_10y2y": 0.48,
-  "hy_spread": 2.72
+  "hy_spread": 2.71
  },
  "sentiment_latest": {
   "vix": {
-   "value": 14.550000190734863,
-   "date": "2026-08-12",
+   "value": 14.630000114440918,
+   "date": "2026-08-13",
    "is_manual": false
   },
   "nk_vi": {
-   "value": 24.989999771118164,
-   "date": "2026-08-10",
+   "value": 32.060001373291016,
+   "date": "2026-08-12",
    "is_manual": false
   },
   "put_call": null,
@@ -45,11 +45,6 @@
     "item": "sentiment:put_call",
     "message": "CBOE CSV取得失敗（形式変更の可能性。MacroMicroで確認し手動入力可）",
     "source_link": "https://en.macromicro.me/series/1651/us-put-call-ratio-index"
-   },
-   {
-    "item": "aaii",
-    "message": "いずれの取得先からも読み取れませんでした（https://www.aaii.com/sentimentsurvey/sent_results: 数値を読み取れず / https://www.aaii.com/sentimentsurvey: 数値を読み取れず / https://en.macromicro.me/charts/20828/us-aaii-sentimentsurvey: HTTPError）。全期間データは会員限定のため import_supply_history.py --aaii で手動取り込み可",
-    "source_link": "https://www.aaii.com/sentimentsurvey/sent_results"
    }
   ],
   "warnings": []
