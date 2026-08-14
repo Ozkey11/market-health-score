@@ -1,12 +1,12 @@
 {
- "version": "2026-08-13-2320",
+ "version": "2026-08-14-2253",
  "model_version": "mhs-core-1.0",
- "updated_at": "2026-08-13T23:20:58+00:00",
- "data_date": "2026-08-13",
+ "updated_at": "2026-08-14T22:53:23+00:00",
+ "data_date": "2026-08-14",
  "symbol": "^GSPC",
  "price_latest": {
-  "close": 7798.990234375,
-  "change_pct": 0.65
+  "close": 7785.759765625,
+  "change_pct": -0.17
  },
  "fundamental_latest": {
   "per_ttm": null,
@@ -14,20 +14,20 @@
   "per_is_manual": false
  },
  "macro_latest": {
-  "us10y": 4.68,
-  "us2y": 4.2,
+  "us10y": 4.63,
+  "us2y": 4.15,
   "yield_curve_10y2y": 0.48,
   "hy_spread": 2.71
  },
  "sentiment_latest": {
   "vix": {
-   "value": 14.630000114440918,
-   "date": "2026-08-13",
+   "value": 14.25,
+   "date": "2026-08-14",
    "is_manual": false
   },
   "nk_vi": {
-   "value": 32.060001373291016,
-   "date": "2026-08-12",
+   "value": 31.649999618530273,
+   "date": "2026-08-13",
    "is_manual": false
   },
   "put_call": null,
