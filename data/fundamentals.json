@@ -1,46 +1,46 @@
 {
-  "updated_at": "2026-09-04T00:18:11.346046+00:00",
+  "updated_at": "2026-09-05T00:18:49.689795+00:00",
   "indicators": {
     "hy_spread": {
-      "value": 2.66,
-      "date": "2026-09-02",
+      "value": 2.65,
+      "date": "2026-09-03",
       "source": "FRED BAMLH0A0HYM2"
     },
     "yield_curve": {
-      "value": 0.43,
-      "date": "2026-09-03",
+      "value": 0.41,
+      "date": "2026-09-04",
       "source": "FRED T10Y2Y"
     },
     "shiller_pe": {
-      "value": 42.38,
+      "value": 41.41,
       "source": "multpl.com/shiller-pe"
     },
     "pe_ttm": {
-      "value": 29.87,
+      "value": 26.36,
       "source": "multpl.com/s-p-500-pe-ratio"
     },
     "move": {
-      "value": 74.6812,
-      "z": 0.184,
+      "value": 73.1045,
+      "z": 0.019,
       "source": "Yahoo ^MOVE"
     },
     "wti": {
-      "value": 91.72,
-      "z": 1.051,
+      "value": 91.22,
+      "z": 1.012,
       "source": "Yahoo CL=F"
     },
     "copper": {
-      "value": 6.6785,
-      "z": 1.548,
+      "value": 6.668,
+      "z": 1.525,
       "source": "Yahoo HG=F"
     },
     "dxy": {
-      "value": 98.929,
-      "z": -0.093,
+      "value": 99.157,
+      "z": 0.105,
       "source": "Yahoo DX-Y.NYB"
     },
     "pcr": {
-      "value": 0.84,
+      "value": 0.76,
       "series": "total",
       "source": "CBOE Daily Stats (total)"
     }
