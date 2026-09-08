@@ -1,8 +1,8 @@
 {
- "updated_at": "2026-09-05T00:19:33+00:00",
- "run_id": "e9ab56beb504",
- "started_at": "2026-09-05T00:18:44+00:00",
- "finished_at": "2026-09-05T00:19:32+00:00",
+ "updated_at": "2026-09-08T00:38:45+00:00",
+ "run_id": "ba3bed9ae160",
+ "started_at": "2026-09-08T00:37:57+00:00",
+ "finished_at": "2026-09-08T00:38:44+00:00",
  "counters": {
   "prices": {
    "ok": 8,
@@ -21,8 +21,8 @@
    "failed": 0
   },
   "supply": {
-   "ok": 19,
-   "failed": 1
+   "ok": 18,
+   "failed": 3
   }
  }
 }

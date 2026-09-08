@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-09-05T00:18:49.689795+00:00",
+  "updated_at": "2026-09-08T00:38:04.093232+00:00",
   "indicators": {
     "hy_spread": {
       "value": 2.65,
@@ -20,23 +20,23 @@
       "source": "multpl.com/s-p-500-pe-ratio"
     },
     "move": {
-      "value": 73.1045,
+      "value": 73.1,
       "z": 0.019,
       "source": "Yahoo ^MOVE"
     },
     "wti": {
-      "value": 91.22,
-      "z": 1.012,
+      "value": 92.36,
+      "z": 1.075,
       "source": "Yahoo CL=F"
     },
     "copper": {
-      "value": 6.668,
-      "z": 1.525,
+      "value": 6.747,
+      "z": 1.65,
       "source": "Yahoo HG=F"
     },
     "dxy": {
-      "value": 99.157,
-      "z": 0.105,
+      "value": 99.176,
+      "z": 0.117,
       "source": "Yahoo DX-Y.NYB"
     },
     "pcr": {
