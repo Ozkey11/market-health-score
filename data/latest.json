@@ -1,11 +1,11 @@
 {
- "version": "2026-09-16-0044",
+ "version": "2026-09-17-0050",
  "model_version": "mhs-core-1.0",
- "updated_at": "2026-09-16T00:44:31+00:00",
- "data_date": "2026-09-15",
+ "updated_at": "2026-09-17T00:50:50+00:00",
+ "data_date": "2026-09-16",
  "symbol": "^GSPC",
  "price_latest": {
-  "close": 7585.72998046875,
+  "close": 7551.81005859375,
   "change_pct": -0.45
  },
  "fundamental_latest": {
@@ -14,20 +14,20 @@
   "per_is_manual": false
  },
  "macro_latest": {
-  "us10y": 4.97,
-  "us2y": 4.65,
-  "yield_curve_10y2y": 0.32,
-  "hy_spread": 2.71
+  "us10y": 5.0,
+  "us2y": 4.67,
+  "yield_curve_10y2y": 0.33,
+  "hy_spread": 2.76
  },
  "sentiment_latest": {
   "vix": {
-   "value": 17.200000762939453,
-   "date": "2026-09-15",
+   "value": 17.709999084472656,
+   "date": "2026-09-16",
    "is_manual": false
   },
   "nk_vi": {
-   "value": 30.549999237060547,
-   "date": "2026-09-16",
+   "value": 28.670000076293945,
+   "date": "2026-09-17",
    "is_manual": false
   },
   "put_call": null,
@@ -52,7 +52,7 @@
     "source_link": "https://cdn.finra.org/equity/regsho/daily/"
    },
    {
-    "item": "supply_us:2026-09-16",
+    "item": "supply_us:2026-09-17",
     "message": "HTTP 403",
     "source_link": "https://cdn.finra.org/equity/regsho/daily/"
    },
