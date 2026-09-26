@@ -1,314 +1,314 @@
 {
- "updated_at": "2026-09-25T00:44:40+00:00",
- "run_id": "35c7f0155404",
+ "updated_at": "2026-09-26T00:49:15+00:00",
+ "run_id": "ca57cc0c08ac",
  "items": [
   {
    "item": "prices:^GSPC",
    "status": "ok",
-   "message": "752行取得",
+   "message": "753行取得",
    "source_link": "",
-   "occurred_at": "2026-09-25T00:43:43+00:00"
+   "occurred_at": "2026-09-26T00:48:29+00:00"
   },
   {
    "item": "prices:SPY",
    "status": "ok",
    "message": "753行取得",
    "source_link": "",
-   "occurred_at": "2026-09-25T00:43:43+00:00"
+   "occurred_at": "2026-09-26T00:48:29+00:00"
   },
   {
    "item": "prices:QQQ",
    "status": "ok",
    "message": "753行取得",
    "source_link": "",
-   "occurred_at": "2026-09-25T00:43:43+00:00"
+   "occurred_at": "2026-09-26T00:48:30+00:00"
   },
   {
    "item": "prices:IWM",
    "status": "ok",
    "message": "753行取得",
    "source_link": "",
-   "occurred_at": "2026-09-25T00:43:44+00:00"
+   "occurred_at": "2026-09-26T00:48:30+00:00"
   },
   {
    "item": "prices:SOXL",
    "status": "ok",
    "message": "753行取得",
    "source_link": "",
-   "occurred_at": "2026-09-25T00:43:44+00:00"
+   "occurred_at": "2026-09-26T00:48:30+00:00"
   },
   {
    "item": "prices:^N225",
    "status": "ok",
-   "message": "731行取得",
+   "message": "732行取得",
    "source_link": "",
-   "occurred_at": "2026-09-25T00:43:44+00:00"
+   "occurred_at": "2026-09-26T00:48:30+00:00"
   },
   {
    "item": "prices:1306.T",
    "status": "ok",
    "message": "732行取得",
    "source_link": "",
-   "occurred_at": "2026-09-25T00:43:44+00:00"
+   "occurred_at": "2026-09-26T00:48:31+00:00"
   },
   {
    "item": "prices:^VIX",
    "status": "ok",
-   "message": "754行取得",
+   "message": "756行取得",
    "source_link": "",
-   "occurred_at": "2026-09-25T00:43:45+00:00"
+   "occurred_at": "2026-09-26T00:48:31+00:00"
   },
   {
    "item": "macro:DGS10",
    "status": "ok",
-   "message": "932行取得",
+   "message": "933行取得",
    "source_link": "",
-   "occurred_at": "2026-09-25T00:43:45+00:00"
+   "occurred_at": "2026-09-26T00:48:31+00:00"
   },
   {
    "item": "macro:DGS2",
    "status": "ok",
-   "message": "932行取得",
+   "message": "933行取得",
    "source_link": "",
-   "occurred_at": "2026-09-25T00:43:46+00:00"
+   "occurred_at": "2026-09-26T00:48:31+00:00"
   },
   {
    "item": "macro:BAMLH0A0HYM2",
    "status": "ok",
    "message": "787行取得",
    "source_link": "",
-   "occurred_at": "2026-09-25T00:43:46+00:00"
+   "occurred_at": "2026-09-26T00:48:32+00:00"
   },
   {
    "item": "macro:FEDFUNDS",
    "status": "ok",
    "message": "44行取得",
    "source_link": "",
-   "occurred_at": "2026-09-25T00:43:46+00:00"
+   "occurred_at": "2026-09-26T00:48:32+00:00"
   },
   {
    "item": "macro:CPIAUCSL",
    "status": "ok",
    "message": "43行取得",
    "source_link": "",
-   "occurred_at": "2026-09-25T00:43:47+00:00"
+   "occurred_at": "2026-09-26T00:48:32+00:00"
   },
   {
    "item": "macro:UNRATE",
    "status": "ok",
    "message": "43行取得",
    "source_link": "",
-   "occurred_at": "2026-09-25T00:43:47+00:00"
+   "occurred_at": "2026-09-26T00:48:32+00:00"
   },
   {
    "item": "sentiment:vix",
    "status": "ok",
-   "message": "VIX=15.67 (2026-09-24)",
+   "message": "VIX=14.87 (2026-09-25)",
    "source_link": "",
-   "occurred_at": "2026-09-25T00:43:47+00:00"
+   "occurred_at": "2026-09-26T00:48:33+00:00"
   },
   {
    "item": "sentiment:nk_vi",
    "status": "ok",
-   "message": "日経VI=27.17 (2026-09-25)",
+   "message": "日経VI=28.11 (2026-09-24)",
    "source_link": "",
-   "occurred_at": "2026-09-25T00:43:47+00:00"
+   "occurred_at": "2026-09-26T00:48:33+00:00"
   },
   {
    "item": "sentiment:fear_greed",
    "status": "failed",
    "message": "HTTPError: HTTP Error 418: Unknown Error（非公式APIのため失敗時は手動入力可）",
    "source_link": "https://edition.cnn.com/markets/fear-and-greed",
-   "occurred_at": "2026-09-25T00:43:47+00:00"
+   "occurred_at": "2026-09-26T00:48:33+00:00"
   },
   {
    "item": "sentiment:put_call",
    "status": "failed",
    "message": "CBOE CSV取得失敗（形式変更の可能性。MacroMicroで確認し手動入力可）",
    "source_link": "https://en.macromicro.me/series/1651/us-put-call-ratio-index",
-   "occurred_at": "2026-09-25T00:43:47+00:00"
+   "occurred_at": "2026-09-26T00:48:34+00:00"
   },
   {
    "item": "supply_us:2026-09-10",
    "status": "ok",
    "message": "64銘柄",
    "source_link": "",
-   "occurred_at": "2026-09-25T00:44:01+00:00"
+   "occurred_at": "2026-09-26T00:48:45+00:00"
   },
   {
    "item": "supply_us:2026-09-11",
    "status": "ok",
    "message": "64銘柄",
    "source_link": "",
-   "occurred_at": "2026-09-25T00:44:01+00:00"
+   "occurred_at": "2026-09-26T00:48:45+00:00"
   },
   {
    "item": "supply_us:2026-09-14",
    "status": "ok",
    "message": "64銘柄",
    "source_link": "",
-   "occurred_at": "2026-09-25T00:44:02+00:00"
+   "occurred_at": "2026-09-26T00:48:45+00:00"
   },
   {
    "item": "supply_us:2026-09-15",
    "status": "ok",
    "message": "64銘柄",
    "source_link": "",
-   "occurred_at": "2026-09-25T00:44:02+00:00"
+   "occurred_at": "2026-09-26T00:48:46+00:00"
   },
   {
    "item": "supply_us:2026-09-16",
    "status": "ok",
    "message": "64銘柄",
    "source_link": "",
-   "occurred_at": "2026-09-25T00:44:02+00:00"
+   "occurred_at": "2026-09-26T00:48:46+00:00"
   },
   {
    "item": "supply_us:2026-09-17",
    "status": "ok",
    "message": "64銘柄",
    "source_link": "",
-   "occurred_at": "2026-09-25T00:44:02+00:00"
+   "occurred_at": "2026-09-26T00:48:47+00:00"
   },
   {
    "item": "supply_us:2026-09-18",
    "status": "ok",
    "message": "64銘柄",
    "source_link": "",
-   "occurred_at": "2026-09-25T00:44:03+00:00"
+   "occurred_at": "2026-09-26T00:48:47+00:00"
   },
   {
    "item": "supply_us:2026-09-21",
    "status": "ok",
    "message": "64銘柄",
    "source_link": "",
-   "occurred_at": "2026-09-25T00:44:03+00:00"
+   "occurred_at": "2026-09-26T00:48:47+00:00"
   },
   {
    "item": "supply_us:2026-09-22",
    "status": "ok",
    "message": "64銘柄",
    "source_link": "",
-   "occurred_at": "2026-09-25T00:44:03+00:00"
+   "occurred_at": "2026-09-26T00:48:48+00:00"
   },
   {
    "item": "supply_us:2026-09-23",
    "status": "ok",
    "message": "64銘柄",
    "source_link": "",
-   "occurred_at": "2026-09-25T00:44:04+00:00"
+   "occurred_at": "2026-09-26T00:48:48+00:00"
   },
   {
    "item": "supply_us:2026-09-24",
    "status": "ok",
    "message": "64銘柄",
    "source_link": "",
-   "occurred_at": "2026-09-25T00:44:04+00:00"
+   "occurred_at": "2026-09-26T00:48:48+00:00"
   },
   {
    "item": "supply_us:2026-09-25",
-   "status": "failed",
-   "message": "HTTP 403",
-   "source_link": "https://cdn.finra.org/equity/regsho/daily/",
-   "occurred_at": "2026-09-25T00:44:04+00:00"
+   "status": "ok",
+   "message": "64銘柄",
+   "source_link": "",
+   "occurred_at": "2026-09-26T00:48:49+00:00"
+  },
+  {
+   "item": "supply_jp:2026-09-18",
+   "status": "ok",
+   "message": "4253銘柄 (様式:current / PDF記載4262銘柄)",
+   "source_link": "",
+   "occurred_at": "2026-09-26T00:48:57+00:00"
   },
   {
    "item": "supply_jp:2026-09-11",
    "status": "ok",
    "message": "4250銘柄 (様式:current / PDF記載4259銘柄)",
    "source_link": "",
-   "occurred_at": "2026-09-25T00:44:15+00:00"
+   "occurred_at": "2026-09-26T00:49:04+00:00"
   },
   {
    "item": "supply_jp:2026-09-04",
    "status": "ok",
    "message": "4249銘柄 (様式:current / PDF記載4253銘柄)",
    "source_link": "",
-   "occurred_at": "2026-09-25T00:44:25+00:00"
+   "occurred_at": "2026-09-26T00:49:11+00:00"
   },
   {
-   "item": "supply_jp:2026-08-28",
+   "item": "short_ratio_jp:2026-09-25",
    "status": "ok",
-   "message": "4252銘柄 (様式:current / PDF記載4255銘柄)",
+   "message": "空売り比率 40.0%",
    "source_link": "",
-   "occurred_at": "2026-09-25T00:44:34+00:00"
+   "occurred_at": "2026-09-26T00:49:12+00:00"
   },
   {
    "item": "short_ratio_jp:2026-09-24",
    "status": "ok",
    "message": "空売り比率 41.0%",
    "source_link": "",
-   "occurred_at": "2026-09-25T00:44:35+00:00"
+   "occurred_at": "2026-09-26T00:49:12+00:00"
   },
   {
    "item": "short_ratio_jp:2026-09-18",
    "status": "ok",
    "message": "空売り比率 39.4%",
    "source_link": "",
-   "occurred_at": "2026-09-25T00:44:36+00:00"
+   "occurred_at": "2026-09-26T00:49:12+00:00"
   },
   {
    "item": "short_ratio_jp:2026-09-17",
    "status": "ok",
    "message": "空売り比率 41.4%",
    "source_link": "",
-   "occurred_at": "2026-09-25T00:44:36+00:00"
+   "occurred_at": "2026-09-26T00:49:12+00:00"
   },
   {
    "item": "short_ratio_jp:2026-09-16",
    "status": "ok",
    "message": "空売り比率 41.5%",
    "source_link": "",
-   "occurred_at": "2026-09-25T00:44:37+00:00"
+   "occurred_at": "2026-09-26T00:49:13+00:00"
   },
   {
    "item": "short_ratio_jp:2026-09-15",
    "status": "ok",
    "message": "空売り比率 39.9%",
    "source_link": "",
-   "occurred_at": "2026-09-25T00:44:37+00:00"
+   "occurred_at": "2026-09-26T00:49:13+00:00"
   },
   {
    "item": "short_ratio_jp:2026-09-14",
    "status": "ok",
    "message": "空売り比率 38.1%",
    "source_link": "",
-   "occurred_at": "2026-09-25T00:44:37+00:00"
+   "occurred_at": "2026-09-26T00:49:13+00:00"
   },
   {
    "item": "short_ratio_jp:2026-09-11",
    "status": "ok",
    "message": "空売り比率 44.9%",
    "source_link": "",
-   "occurred_at": "2026-09-25T00:44:38+00:00"
+   "occurred_at": "2026-09-26T00:49:14+00:00"
   },
   {
    "item": "short_ratio_jp:2026-09-10",
    "status": "ok",
    "message": "空売り比率 42.4%",
    "source_link": "",
-   "occurred_at": "2026-09-25T00:44:38+00:00"
+   "occurred_at": "2026-09-26T00:49:14+00:00"
   },
   {
    "item": "short_ratio_jp:2026-09-09",
    "status": "ok",
    "message": "空売り比率 44.2%",
    "source_link": "",
-   "occurred_at": "2026-09-25T00:44:39+00:00"
-  },
-  {
-   "item": "short_ratio_jp:2026-09-08",
-   "status": "ok",
-   "message": "空売り比率 42.4%",
-   "source_link": "",
-   "occurred_at": "2026-09-25T00:44:39+00:00"
+   "occurred_at": "2026-09-26T00:49:14+00:00"
   },
   {
    "item": "aaii",
    "status": "ok",
    "message": "強気32.7% / 弱気32.7% / spread0.0",
    "source_link": "",
-   "occurred_at": "2026-09-25T00:44:40+00:00"
+   "occurred_at": "2026-09-26T00:49:15+00:00"
   }
  ]
 }
