@@ -1,237 +1,244 @@
 {
- "updated_at": "2026-10-02T01:47:14+00:00",
- "run_id": "a9d6b62b6375",
+ "updated_at": "2026-10-03T01:21:23+00:00",
+ "run_id": "92dd72d02c65",
  "items": [
   {
    "item": "prices:^GSPC",
    "status": "ok",
    "message": "753行取得",
    "source_link": "",
-   "occurred_at": "2026-10-02T01:46:55+00:00"
+   "occurred_at": "2026-10-03T01:21:01+00:00"
   },
   {
    "item": "prices:SPY",
    "status": "ok",
    "message": "753行取得",
    "source_link": "",
-   "occurred_at": "2026-10-02T01:46:55+00:00"
+   "occurred_at": "2026-10-03T01:21:01+00:00"
   },
   {
    "item": "prices:QQQ",
    "status": "ok",
    "message": "753行取得",
    "source_link": "",
-   "occurred_at": "2026-10-02T01:46:55+00:00"
+   "occurred_at": "2026-10-03T01:21:01+00:00"
   },
   {
    "item": "prices:IWM",
    "status": "ok",
    "message": "753行取得",
    "source_link": "",
-   "occurred_at": "2026-10-02T01:46:56+00:00"
+   "occurred_at": "2026-10-03T01:21:02+00:00"
   },
   {
    "item": "prices:SOXL",
    "status": "ok",
    "message": "753行取得",
    "source_link": "",
-   "occurred_at": "2026-10-02T01:46:56+00:00"
+   "occurred_at": "2026-10-03T01:21:02+00:00"
   },
   {
    "item": "prices:^N225",
    "status": "ok",
    "message": "732行取得",
    "source_link": "",
-   "occurred_at": "2026-10-02T01:46:56+00:00"
+   "occurred_at": "2026-10-03T01:21:02+00:00"
   },
   {
    "item": "prices:1306.T",
    "status": "ok",
    "message": "732行取得",
    "source_link": "",
-   "occurred_at": "2026-10-02T01:46:56+00:00"
+   "occurred_at": "2026-10-03T01:21:02+00:00"
   },
   {
    "item": "prices:^VIX",
    "status": "ok",
-   "message": "755行取得",
+   "message": "756行取得",
    "source_link": "",
-   "occurred_at": "2026-10-02T01:46:56+00:00"
+   "occurred_at": "2026-10-03T01:21:03+00:00"
   },
   {
    "item": "macro:DGS10",
    "status": "ok",
-   "message": "937行取得",
+   "message": "938行取得",
    "source_link": "",
-   "occurred_at": "2026-10-02T01:46:57+00:00"
+   "occurred_at": "2026-10-03T01:21:03+00:00"
   },
   {
    "item": "macro:DGS2",
    "status": "ok",
-   "message": "937行取得",
+   "message": "938行取得",
    "source_link": "",
-   "occurred_at": "2026-10-02T01:46:57+00:00"
+   "occurred_at": "2026-10-03T01:21:03+00:00"
   },
   {
    "item": "macro:BAMLH0A0HYM2",
    "status": "ok",
    "message": "786行取得",
    "source_link": "",
-   "occurred_at": "2026-10-02T01:46:58+00:00"
+   "occurred_at": "2026-10-03T01:21:04+00:00"
   },
   {
    "item": "macro:FEDFUNDS",
    "status": "ok",
    "message": "45行取得",
    "source_link": "",
-   "occurred_at": "2026-10-02T01:46:58+00:00"
+   "occurred_at": "2026-10-03T01:21:04+00:00"
   },
   {
    "item": "macro:CPIAUCSL",
    "status": "ok",
    "message": "43行取得",
    "source_link": "",
-   "occurred_at": "2026-10-02T01:46:58+00:00"
+   "occurred_at": "2026-10-03T01:21:04+00:00"
   },
   {
    "item": "macro:UNRATE",
    "status": "ok",
-   "message": "43行取得",
+   "message": "44行取得",
    "source_link": "",
-   "occurred_at": "2026-10-02T01:46:58+00:00"
+   "occurred_at": "2026-10-03T01:21:04+00:00"
   },
   {
    "item": "sentiment:vix",
    "status": "ok",
-   "message": "VIX=16.39 (2026-10-01)",
+   "message": "VIX=15.31 (2026-10-02)",
    "source_link": "",
-   "occurred_at": "2026-10-02T01:46:58+00:00"
+   "occurred_at": "2026-10-03T01:21:04+00:00"
   },
   {
    "item": "sentiment:nk_vi",
    "status": "ok",
-   "message": "日経VI=27.33 (2026-10-02)",
+   "message": "日経VI=22.92 (2026-10-01)",
    "source_link": "",
-   "occurred_at": "2026-10-02T01:46:58+00:00"
+   "occurred_at": "2026-10-03T01:21:04+00:00"
   },
   {
    "item": "sentiment:fear_greed",
    "status": "failed",
    "message": "HTTPError: HTTP Error 418: Unknown Error（非公式APIのため失敗時は手動入力可）",
    "source_link": "https://edition.cnn.com/markets/fear-and-greed",
-   "occurred_at": "2026-10-02T01:46:59+00:00"
+   "occurred_at": "2026-10-03T01:21:05+00:00"
   },
   {
    "item": "sentiment:put_call",
    "status": "failed",
    "message": "CBOE CSV取得失敗（形式変更の可能性。MacroMicroで確認し手動入力可）",
    "source_link": "https://en.macromicro.me/series/1651/us-put-call-ratio-index",
-   "occurred_at": "2026-10-02T01:46:59+00:00"
+   "occurred_at": "2026-10-03T01:21:05+00:00"
   },
   {
    "item": "supply_us:2026-09-17",
    "status": "ok",
    "message": "64銘柄",
    "source_link": "",
-   "occurred_at": "2026-10-02T01:47:09+00:00"
+   "occurred_at": "2026-10-03T01:21:13+00:00"
   },
   {
    "item": "supply_us:2026-09-18",
    "status": "ok",
    "message": "64銘柄",
    "source_link": "",
-   "occurred_at": "2026-10-02T01:47:09+00:00"
+   "occurred_at": "2026-10-03T01:21:14+00:00"
   },
   {
    "item": "supply_us:2026-09-21",
    "status": "ok",
    "message": "64銘柄",
    "source_link": "",
-   "occurred_at": "2026-10-02T01:47:09+00:00"
+   "occurred_at": "2026-10-03T01:21:14+00:00"
   },
   {
    "item": "supply_us:2026-09-22",
    "status": "ok",
    "message": "64銘柄",
    "source_link": "",
-   "occurred_at": "2026-10-02T01:47:09+00:00"
+   "occurred_at": "2026-10-03T01:21:15+00:00"
   },
   {
    "item": "supply_us:2026-09-23",
    "status": "ok",
    "message": "64銘柄",
    "source_link": "",
-   "occurred_at": "2026-10-02T01:47:10+00:00"
+   "occurred_at": "2026-10-03T01:21:16+00:00"
   },
   {
    "item": "supply_us:2026-09-24",
    "status": "ok",
    "message": "64銘柄",
    "source_link": "",
-   "occurred_at": "2026-10-02T01:47:10+00:00"
+   "occurred_at": "2026-10-03T01:21:16+00:00"
   },
   {
    "item": "supply_us:2026-09-25",
    "status": "ok",
    "message": "64銘柄",
    "source_link": "",
-   "occurred_at": "2026-10-02T01:47:10+00:00"
+   "occurred_at": "2026-10-03T01:21:16+00:00"
   },
   {
    "item": "supply_us:2026-09-28",
    "status": "ok",
    "message": "64銘柄",
    "source_link": "",
-   "occurred_at": "2026-10-02T01:47:10+00:00"
+   "occurred_at": "2026-10-03T01:21:17+00:00"
   },
   {
    "item": "supply_us:2026-09-29",
    "status": "ok",
    "message": "64銘柄",
    "source_link": "",
-   "occurred_at": "2026-10-02T01:47:10+00:00"
+   "occurred_at": "2026-10-03T01:21:17+00:00"
   },
   {
    "item": "supply_us:2026-09-30",
    "status": "ok",
    "message": "64銘柄",
    "source_link": "",
-   "occurred_at": "2026-10-02T01:47:10+00:00"
+   "occurred_at": "2026-10-03T01:21:18+00:00"
   },
   {
    "item": "supply_us:2026-10-01",
    "status": "ok",
    "message": "64銘柄",
    "source_link": "",
-   "occurred_at": "2026-10-02T01:47:10+00:00"
+   "occurred_at": "2026-10-03T01:21:18+00:00"
   },
   {
    "item": "supply_us:2026-10-02",
-   "status": "failed",
-   "message": "HTTP 403",
-   "source_link": "https://cdn.finra.org/equity/regsho/daily/",
-   "occurred_at": "2026-10-02T01:47:10+00:00"
+   "status": "ok",
+   "message": "64銘柄",
+   "source_link": "",
+   "occurred_at": "2026-10-03T01:21:19+00:00"
   },
   {
    "item": "supply_jp:0000-01-59",
    "status": "failed",
    "message": "ValueError: 1銘柄も解析できませんでした（様式変更の可能性） 先頭: 信用取引現在高 2026/09/25 Outstanding Margin Transactions 東京証券取引所株式部 申込日基準 Base：application date 社内対当 株数 金額 株数 金額 株数 金額 株数 金額 株数(A) 金額 株数(B) 金額 株数 金額 株数 金額 株",
    "source_link": "https://www.jpx.co.jp/markets/statistics-equities/margin/tvdivq0000001rq1-att/tvdivq0000015980.pdf",
-   "occurred_at": "2026-10-02T01:47:14+00:00"
+   "occurred_at": "2026-10-03T01:21:22+00:00"
+  },
+  {
+   "item": "short_ratio_jp:2026-10-02",
+   "status": "ok",
+   "message": "空売り比率 41.1%",
+   "source_link": "",
+   "occurred_at": "2026-10-03T01:21:22+00:00"
   },
   {
    "item": "short_ratio_jp:2026-10-01",
    "status": "ok",
    "message": "空売り比率 38.8%",
    "source_link": "",
-   "occurred_at": "2026-10-02T01:47:14+00:00"
+   "occurred_at": "2026-10-03T01:21:22+00:00"
   },
   {
    "item": "aaii",
    "status": "ok",
    "message": "強気34.6% / 弱気34.6% / spread0.0",
    "source_link": "",
-   "occurred_at": "2026-10-02T01:47:14+00:00"
+   "occurred_at": "2026-10-03T01:21:23+00:00"
   }
  ]
 }
