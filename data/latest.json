@@ -1,12 +1,12 @@
 {
- "version": "2026-10-06-0227",
+ "version": "2026-10-07-0145",
  "model_version": "mhs-core-1.0",
- "updated_at": "2026-10-06T02:27:23+00:00",
- "data_date": "2026-10-05",
+ "updated_at": "2026-10-07T01:45:52+00:00",
+ "data_date": "2026-10-06",
  "symbol": "^GSPC",
  "price_latest": {
-  "close": 7773.9501953125,
-  "change_pct": 0.66
+  "close": 7818.93017578125,
+  "change_pct": 0.58
  },
  "fundamental_latest": {
   "per_ttm": null,
@@ -14,20 +14,20 @@
   "per_is_manual": false
  },
  "macro_latest": {
-  "us10y": 5.28,
-  "us2y": 4.83,
-  "yield_curve_10y2y": 0.45,
-  "hy_spread": 3.1
+  "us10y": 5.31,
+  "us2y": 4.84,
+  "yield_curve_10y2y": 0.47,
+  "hy_spread": 3.12
  },
  "sentiment_latest": {
   "vix": {
-   "value": 15.520000457763672,
-   "date": "2026-10-05",
+   "value": 15.010000228881836,
+   "date": "2026-10-06",
    "is_manual": false
   },
   "nk_vi": {
-   "value": 28.93000030517578,
-   "date": "2026-10-06",
+   "value": 28.350000381469727,
+   "date": "2026-10-07",
    "is_manual": false
   },
   "put_call": null,
@@ -47,13 +47,13 @@
     "source_link": "https://en.macromicro.me/series/1651/us-put-call-ratio-index"
    },
    {
-    "item": "supply_us:2026-10-06",
+    "item": "supply_us:2026-10-07",
     "message": "HTTP 403",
     "source_link": "https://cdn.finra.org/equity/regsho/daily/"
    },
    {
     "item": "supply_jp:0000-01-59",
-    "message": "ValueError: 1銘柄も解析できませんでした（様式変更の可能性） 先頭: 信用取引現在高 2026/09/25 Outstanding Margin Transactions 東京証券取引所株式部 申込日基準 Base：application date 社内対当 株数 金額 株数 金額 株数 金額 株数 金額 株数(A) 金額 株数(B) 金額 株数 金額 株数 金額 株",
+    "message": "ValueError: 1銘柄も解析できませんでした（様式変更の可能性） 先頭: 信用取引現在高 2026/10/06 Current outstanding margin trading 東京証券取引所株式部 申込日基準 Base：application date 社内対当 株数 金額 株数 金額 株数 金額 株数 金額 株数 金額 株数 金額 株数(A) 金額 株数(B) 金",
     "source_link": "https://www.jpx.co.jp/markets/statistics-equities/margin/tvdivq0000001rq1-att/tvdivq0000015980.pdf"
    }
   ],
