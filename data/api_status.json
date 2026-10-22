@@ -1,16 +1,16 @@
 {
- "updated_at": "2026-10-21T00:49:23+00:00",
- "run_id": "11e7824b8a1e",
- "started_at": "2026-10-21T00:48:57+00:00",
- "finished_at": "2026-10-21T00:49:22+00:00",
+ "updated_at": "2026-10-22T00:50:59+00:00",
+ "run_id": "f67be85c6aa1",
+ "started_at": "2026-10-22T00:50:32+00:00",
+ "finished_at": "2026-10-22T00:50:59+00:00",
  "counters": {
   "prices": {
    "ok": 8,
    "failed": 0
   },
   "macro": {
-   "ok": 6,
-   "failed": 0
+   "ok": 0,
+   "failed": 6
   },
   "sentiment": {
    "ok": 2,
