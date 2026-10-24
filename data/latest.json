@@ -1,12 +1,12 @@
 {
- "version": "2026-10-23-0052",
+ "version": "2026-10-24-0059",
  "model_version": "mhs-core-1.0",
- "updated_at": "2026-10-23T00:52:27+00:00",
- "data_date": "2026-10-22",
+ "updated_at": "2026-10-24T00:59:32+00:00",
+ "data_date": "2026-10-23",
  "symbol": "^GSPC",
  "price_latest": {
-  "close": 7663.43017578125,
-  "change_pct": -1.21
+  "close": 7623.68017578125,
+  "change_pct": -0.52
  },
  "fundamental_latest": {
   "per_ttm": null,
@@ -14,20 +14,20 @@
   "per_is_manual": false
  },
  "macro_latest": {
-  "us10y": 5.13,
-  "us2y": 4.81,
-  "yield_curve_10y2y": 0.32,
-  "hy_spread": 3.27
+  "us10y": 4.96,
+  "us2y": 4.65,
+  "yield_curve_10y2y": 0.31,
+  "hy_spread": 3.4
  },
  "sentiment_latest": {
   "vix": {
-   "value": 19.030000686645508,
-   "date": "2026-10-22",
+   "value": 19.450000762939453,
+   "date": "2026-10-23",
    "is_manual": false
   },
   "nk_vi": {
-   "value": 41.16999816894531,
-   "date": "2026-10-23",
+   "value": 35.970001220703125,
+   "date": "2026-10-22",
    "is_manual": false
   },
   "put_call": null,
@@ -45,11 +45,6 @@
     "item": "sentiment:put_call",
     "message": "CBOE CSV取得失敗（形式変更の可能性。MacroMicroで確認し手動入力可）",
     "source_link": "https://en.macromicro.me/series/1651/us-put-call-ratio-index"
-   },
-   {
-    "item": "supply_us:2026-10-23",
-    "message": "HTTP 403",
-    "source_link": "https://cdn.finra.org/equity/regsho/daily/"
    },
    {
     "item": "supply_jp:0000-01-59",
