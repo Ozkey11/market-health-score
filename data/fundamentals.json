@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-11-11T02:08:52.997441+00:00",
+  "updated_at": "2026-11-12T03:17:32.378866+00:00",
   "indicators": {
     "hy_spread": {
       "value": 3.34,
@@ -12,35 +12,35 @@
       "source": "FRED T10Y2Y"
     },
     "shiller_pe": {
-      "value": 39.7,
+      "value": 40.24,
       "source": "multpl.com/shiller-pe"
     },
     "pe_ttm": {
-      "value": 25.65,
+      "value": 26.0,
       "source": "multpl.com/s-p-500-pe-ratio"
     },
     "move": {
-      "value": 92.4315,
+      "value": 92.43,
       "z": 1.201,
       "source": "Yahoo ^MOVE"
     },
     "wti": {
-      "value": 86.2,
-      "z": 0.292,
+      "value": 85.68,
+      "z": 0.255,
       "source": "Yahoo CL=F"
     },
     "copper": {
-      "value": 6.3005,
-      "z": 0.505,
+      "value": 6.254,
+      "z": 0.4,
       "source": "Yahoo HG=F"
     },
     "dxy": {
-      "value": 102.221,
-      "z": 1.894,
+      "value": 103.022,
+      "z": 2.427,
       "source": "Yahoo DX-Y.NYB"
     },
     "pcr": {
-      "value": 0.88,
+      "value": 0.92,
       "series": "total",
       "source": "CBOE Daily Stats (total)"
     }
